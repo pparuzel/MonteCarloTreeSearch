@@ -6,15 +6,7 @@ type Board
     row::Int64
     show::Function
 
-    function Board(dim::Int64; row=3)
-        this = new()
-        println("Initilizing TicTacToe board...")
-        this.dim = dim
-        this.row = row
-        this.states = zeros(Int64, (dim, dim))
-        this.turn = 0
-        this.active = true
-
+    function init!(this)
         this.show = function()
             println("> Turn $(this.turn)")
             for i in 1:length(this.states)
@@ -26,6 +18,18 @@ type Board
             end
             println()
         end
+    end
+
+    function Board(dim::Int64; row=3)
+        this = new()
+        println("Initilizing TicTacToe board...")
+        this.dim = dim
+        this.row = row
+        this.states = zeros(Int8, (dim, dim))
+        this.turn = 0
+        this.active = true
+
+        init!(this)
 
         println("Board<$(this.dim)x$(this.dim)> Condition: $(this.row) in a row")
 
@@ -36,10 +40,10 @@ type Board
         this = new()
         println("Initializing TicTacToe board...")
         bsize = size(board)
-        if bsize[0] != bsize[1]
-            throw(DimensionMismatch())
+        if bsize[1] != bsize[2]
+            throw(DimensionMismatch("Game board must be a square"))
         end
-        this.dim = bsize[0]
+        this.dim = bsize[1]
         this.row = row
         this.states = board
         # calculate turn
@@ -47,7 +51,13 @@ type Board
         for i in 1:length(board)
             this.turn += Int64(board[i] != 0)
         end
-        this.active = ?
+        this.active = this.turn < 9 ? true : false;
+
+        init!(this)
+
+        println("Board<$(this.dim)x$(this.dim)> Condition: $(this.row) in a row")
+
+        return this
     end
 end
 
@@ -65,10 +75,10 @@ function check(board::Board)
             else
                 σ = 1
             end
-            if board.states[i, j] == board.states[i, j + 1]
+            if board.states[j, i] == board.states[j, i + 1]
                 ρ += 1
                 if ρ >= 3
-                    return board.states[i, j]
+                    return board.states[j, i]
                 end
             else
                 ρ = 1
