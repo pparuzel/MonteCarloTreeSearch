@@ -51,7 +51,7 @@ type Board
         for i in 1:length(board)
             this.turn += Int64(board[i] != 0)
         end
-        this.active = this.turn < 9 ? true : false;
+        this.active = this.turn < 9 && check(this) == 0 ? true : false;
 
         init!(this)
 
@@ -67,23 +67,33 @@ function check(board::Board)
         σ = 1
         ρ = 1
         for i in 1:(board.dim - 1)
+            # rows
             if board.states[i, j] == board.states[i + 1, j]
                 σ += 1
-                if σ >= 3
+                if σ >= board.row
                     return board.states[i, j]
                 end
             else
                 σ = 1
             end
+            # columns
             if board.states[j, i] == board.states[j, i + 1]
                 ρ += 1
-                if ρ >= 3
+                if ρ >= board.row
                     return board.states[j, i]
                 end
             else
                 ρ = 1
             end
         end
+    end
+    # diagonals (hard-coded for 3x3)
+    # TODO: implement general-case checking
+    if board.states[1, 1] == board.states[2, 2] == board.states[3, 3] != 0
+        return board.states[1, 1]
+    end
+    if board.states[1, 3] == board.states[2, 2] == board.states[3, 1] != 0
+        return board.states[1, 3]
     end
     return 0
 end
