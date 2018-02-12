@@ -50,8 +50,24 @@ function pve()
     tictactoe = Board(3, row=3)
     tictactoe.show()
     ai = AI(true, 3, plays=tictactoe)
+    # TODO:
+    '''
+        player = Player()
+        tictactoe.players = (player, ai)
+        while tictactoe.isrunning
+            tictactoe.move()
+            tictactoe.show()
+    '''
     while tictactoe.isrunning
         tictactoe.move(ai.choice())
+        tictactoe.show()
+
+        if !tictactoe.isrunning
+            break
+        end
+
+        player_choice = parse(Int64, readline())
+        tictactoe.move(player_choice)
         tictactoe.show()
     end
 end
