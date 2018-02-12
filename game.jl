@@ -1,12 +1,20 @@
-type Board
+abstract type Controller end
+
+mutable struct Board <: Controller
     dim::Int64
     states::Array{Int8, 2}
     turn::Int64
-    active::Bool
+    isrunning::Bool
     row::Int64
     show::Function
+    move::Function
 
     function init!(this)
+        this.move = function(position::Int64)
+            put!(this, position)
+            check(this)
+        end
+
         this.show = function()
             println("> Turn $(this.turn)")
             for i in 1:length(this.states)
@@ -27,7 +35,7 @@ type Board
         this.row = row
         this.states = zeros(Int8, (dim, dim))
         this.turn = 0
-        this.active = true
+        this.isrunning = true
 
         init!(this)
 
@@ -51,7 +59,7 @@ type Board
         for i in 1:length(board)
             this.turn += Int64(board[i] != 0)
         end
-        this.active = this.turn < 9 && check(this) == 0 ? true : false;
+        this.isrunning = this.turn < 9 && check(this) == 0 ? true : false;
 
         init!(this)
 
@@ -62,13 +70,21 @@ type Board
 end
 
 # find a winner
-function check(board::Board)
+function check(board::Board)::Int8
+    # disable isrunning flag
+    board.isrunning = false
+    # check if any turnsa left
+    if board.turn >= board.dim ^ 2
+        board.isrunning = false
+        return 0
+    end
+    # check horizontal/vertical wins
     for j in 1:(board.dim)
         σ = 1
         ρ = 1
         for i in 1:(board.dim - 1)
             # rows
-            if board.states[i, j] == board.states[i + 1, j]
+            if (board.states[i, j] == board.states[i + 1, j]) && (board.states[i, j] != 0)
                 σ += 1
                 if σ >= board.row
                     return board.states[i, j]
@@ -77,7 +93,7 @@ function check(board::Board)
                 σ = 1
             end
             # columns
-            if board.states[j, i] == board.states[j, i + 1]
+            if (board.states[j, i] == board.states[j, i + 1]) && (board.states[j, i] != 0)
                 ρ += 1
                 if ρ >= board.row
                     return board.states[j, i]
@@ -95,21 +111,17 @@ function check(board::Board)
     if board.states[1, 3] == board.states[2, 2] == board.states[3, 1] != 0
         return board.states[1, 3]
     end
+    # re-enable isrunning flag
+    board.isrunning = true
     return 0
 end
 
 function put!(board::Board, posX::Int64, posY::Int64)
     board.states[posX, posY] = board.turn % 2 == 0 ? 1 : -1
     board.turn += 1
-    if board.turn >= board.dim ^ 2
-        board.active = false
-    end
 end
 
 function put!(board::Board, pos::Int64)
     board.states[pos] = board.turn % 2 == 0 ? 1 : -1
     board.turn += 1
-    if board.turn >= board.dim ^ 2
-        board.active = false
-    end
 end
