@@ -1,3 +1,15 @@
+#=
+
+    Artificial Intelligence structures
+
+=#
+
+if !isdefined(:Game)
+    abstract type Game end
+end
+
+if !isdefined(:Node)
+
 mutable struct Node
     # Tree node
     # Stores information about wins and
@@ -9,7 +21,7 @@ mutable struct Node
     wins::Int64
     sims::Int64
     children::Array{Node, 1}
-    parent::Node
+    parent::Union{Void, Node}
 
     function init!(this::Node)
         this.wins = 0
@@ -33,6 +45,8 @@ mutable struct Node
         return this
     end
 end
+
+end # IF NOT DEFINED
 
 mutable struct Tree
     # Game tree
@@ -64,11 +78,12 @@ mutable struct AI
     mark::Int8
     tree::Tree
     γ::Float64
-    game::Controller
+    # Is it needed?
+    game::Game
     UCT::Function
     choice::Function
 
-    function AI(isX::Bool, dim::Int64; γ=sqrt(2), plays::Controller=nothing)
+    function AI(dim::Int64; γ=sqrt(2), plays::Game=nothing)
         this = new()
         # game mark
         this.mark = isX ? 1 : -1

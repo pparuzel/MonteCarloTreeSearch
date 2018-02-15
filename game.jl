@@ -1,18 +1,27 @@
-abstract type Controller end
+abstract type Game end
 
-mutable struct Board <: Controller
+mutable struct Board <: Game
     dim::Int64
     states::Array{Int8, 2}
     turn::Int64
     isrunning::Bool
     row::Int64
     show::Function
+    make_turn::Function
     move::Function
+    players::Tuple
 
     function init!(this)
+        this.players = (nothing, nothing)
+
         this.move = function(position::Int64)
             put!(this, position)
             check(this)
+        end
+
+        this.make_turn = function()
+            playerid = this.turn % 2 == 0 ? 1 : 2
+            this.move(this.players[playerid].choice())
         end
 
         this.show = function()
@@ -73,7 +82,7 @@ end
 function check(board::Board)::Int8
     # disable isrunning flag
     board.isrunning = false
-    # check if any turnsa left
+    # check if any turn is left
     if board.turn >= board.dim ^ 2
         board.isrunning = false
         return 0
@@ -124,4 +133,11 @@ end
 function put!(board::Board, pos::Int64)
     board.states[pos] = board.turn % 2 == 0 ? 1 : -1
     board.turn += 1
+end
+
+function set_players(game::Game, players::Tuple)
+    @assert length(players) == 2
+    game.players = players
+    game.players[1].mark = Int8(1)
+    game.players[2].mark = Int8(-1)
 end
