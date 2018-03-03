@@ -2,46 +2,23 @@ include("game.jl")
 include("ai.jl")
 include("player.jl")
 
-function selection()
-    # Select the most promising node
-    # until you find a leaf
-    # starting from some given node
-end
-
-function expansion()
-    # Unless leaf node ends the game
-    # expand it by number of possible moves
-    # and choose one of the added nodes randomly
-end
-
-function simulation()
-    # Perform a simulation starting from
-    # the randomly chosen node and return
-    # who won that playout
-end
-
-function backpropagation()
-    # Update information to the parent nodes
-    # up to the given node increasing visits counter
-    # and increasing wins for winner's nodes
-end
-
 function pvp()
-    b = Board(3, row=3)
-    b.show()
+    tictactoe = Board(3, row=3)
+    tictactoe.show()
+    player = Player()
+    tictactoe.players = (player, player)
 
-    while b.isrunning
-        input = parse(Int64, readline())
-        put!(b, input)
-        b.show()
+    while tictactoe.isrunning
+        tictactoe.make_turn()
+        tictactoe.show()
     end
 end
 
 function test()
-    # Template board must be TRANSPOSED
+    # Template board
     intboard = Int8[ 1 -1  0;
                     -1  1  0;
-                     1 -1 -1]'
+                     1 -1 -1]
     board = Board(intboard, row=3)
     board.show()
     println("Winner: ", check(board))
@@ -52,16 +29,28 @@ function pve()
     tictactoe.show()
     ai = AI(3, plays=tictactoe)
     player = Player()
+    set_players!(tictactoe, (ai, player))
 
-    tictactoe.players = (player, ai)
     while tictactoe.isrunning
         tictactoe.make_turn()
         tictactoe.show()
     end
 
-    nothing
+    println("AI.MARK ", ai.mark)
+end
+
+function test_selection()
+    ai = AI(3)
+    ptr = ai.tree.root
+    # tree with root and two children
+    ptr.wins = 2; ptr.sims = 2;
+    ptr.children = Node[Node(ptr), let; tmp = Node(ptr);
+    tmp.wins = 2; tmp.sims = 2; tmp; end]
+    #
+    ptr = selection(ai.gameptr);
+    print(ptr)
 end
 
 # pvp()
-# test()
-pve()
+# pve()
+# test_selection()
