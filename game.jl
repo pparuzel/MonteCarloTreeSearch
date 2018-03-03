@@ -6,16 +6,19 @@ mutable struct Board <: Game
     turn::Int64
     isrunning::Bool
     row::Int64
+    players::Tuple
+    last_move::Int64
     show::Function
     make_turn::Function
     move::Function
-    players::Tuple
 
     function init!(this)
         this.players = (nothing, nothing)
 
         this.move = function(position::Int64)
-            put!(this, position)
+            this.states[position] = this.turn % 2 == 0 ? 1 : -1
+            this.turn += 1
+            this.last_move = position
             check(this)
         end
 
@@ -55,6 +58,7 @@ mutable struct Board <: Game
 
     function Board(board::Array{Int8, 2}; row=3)
         this = new()
+        board = board.'
         println("Initializing TicTacToe board...")
         bsize = size(board)
         if bsize[1] != bsize[2]
@@ -125,17 +129,7 @@ function check(board::Board)::Int8
     return 0
 end
 
-function put!(board::Board, posX::Int64, posY::Int64)
-    board.states[posX, posY] = board.turn % 2 == 0 ? 1 : -1
-    board.turn += 1
-end
-
-function put!(board::Board, pos::Int64)
-    board.states[pos] = board.turn % 2 == 0 ? 1 : -1
-    board.turn += 1
-end
-
-function set_players(game::Game, players::Tuple)
+function set_players!(game::Game, players::Tuple)
     @assert length(players) == 2
     game.players = players
     game.players[1].mark = Int8(1)
