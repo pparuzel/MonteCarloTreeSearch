@@ -139,32 +139,31 @@ mutable struct Board <: Game
         end
         this.tree = Tree(this.xdim ^ 2 - this.turn)
         this.ptr = this.tree.root
-        this.isrunning = this.turn < 9 && check(this) == 0 ? true : false;
+        this.isrunning = this.turn < this.xdim ^ 2 && check(this) == 0 ? true : false;
 
         init!(this)
 
         return this
     end
+end
 
-    function quiet_copy(b::Board)
-        this = new()
-        this.states = b.states
-        this.xdim = b.xdim
-        this.row = b.row
-        # calculate turn
-        this.turn = 0
-        for i in 1:length(this.states)
-            this.turn += Int64(this.states[i] != 0)
-        end
-        this.isrunning = this.turn < 9 && check(this) == 0 ? true : false;
-
-        init!(this)
-
-        this.players = b.players
-        this.ptr = b.ptr
-
-        return this
+function quietcopy(b::Board)
+    this = Board(b.xdim, row=b.row, quiet=true)
+    this.states = copy(b.states)
+    this.row = b.row
+    # calculate turn
+    this.turn = 0
+    for i in 1:length(this.states)
+        this.turn += Int64(this.states[i] != 0)
     end
+    this.isrunning = this.turn < this.xdim ^ 2 && check(this) == 0 ? true : false;
+
+    # init!(this)
+
+    this.players = b.players
+    this.ptr = b.ptr
+
+    return this
 end
 
 function Base.show(io::IO, b::Board)
@@ -270,7 +269,8 @@ end
 using Base
 
 function ai_turn(game::Game; timeLimit=1)
-    g = deepcopy(game)
+    # g = deepcopy(game)
+    g = quietcopy(game)
     timeLimit *= 1e9
     t0 = time_ns()
     # for i in 1:10000
@@ -349,7 +349,7 @@ function simulation(game::Game, result::Int8)::Int8
     # who won that playout
 
     while game.isrunning
-        result = nodemove!(game, rand(1:(9 - game.turn)))
+        result = nodemove!(game, rand(1:(game.xdim ^ 2 - game.turn)))
     end
 
     return result
@@ -469,18 +469,17 @@ function main()
     game
 end
 
-function demo()
-    tictactoe = Board(5, row=3)
+function demo(;size=3, row=3, debug=true, time=1)
+    tictactoe = Board(size, row=row)
     tictactoe.show()
 
     while tictactoe.isrunning
-        ai_turn(tictactoe, timeLimit=0.01)
-        depth(tictactoe.ptr.parent, 1)
+        ai_turn(tictactoe, timeLimit=time)
+        debug && depth(tictactoe.ptr.parent, 1)
         tictactoe.show()
         # readline()
         # tictactoe.move(player.propose())
     end
 end
 
-tmp = Board(intboard, row=3, quiet=true)
 g = main()
