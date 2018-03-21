@@ -241,14 +241,21 @@ function check(board::Board)::Int8
             end
         end
     end
+    diagres = diagcheck(board)
+    diagres != 0 && return diagres
     # diagonals (hard-coded for 3x3)
     # TODO: implement general-case checking
-    if board.states[1, 1] == board.states[2, 2] == board.states[3, 3] != 0
-        return board.states[1, 1]
-    end
-    if board.states[1, 3] == board.states[2, 2] == board.states[3, 1] != 0
-        return board.states[1, 3]
-    end
+    # if board.states[1, 1] == board.states[2, 2] == board.states[3, 3] != 0
+    #     return board.states[1, 1]
+    # end
+    # if board.states[1, 3] == board.states[2, 2] == board.states[3, 1] != 0
+    #     return board.states[1, 3]
+    # end
+
+    # descending diags
+
+    # ascending diags
+
     # check if any turn is left
     if board.turn >= board.xdim ^ 2
         return 0
@@ -482,4 +489,50 @@ function demo(;size=3, row=3, debug=true, time=1)
     end
 end
 
+function diagCheckDesc(b::Board, x::Int64, y::Int64)
+    inarow = 1
+    while x < b.xdim && y < b.xdim
+        if b.states[x, y] == b.states[x + 1, y + 1] != 0
+            inarow += 1
+            if inarow >= b.row
+                return b.states[x, y]
+            end
+        else
+            inarow = 1
+        end
+        x += 1
+        y += 1
+    end
+    return 0
+end
+
+function diagcheck(b::Board)
+    ksize = b.xdim - b.row + 1
+    # descending
+    res = diagCheckDesc(b, 1, 1)
+    res != 0 && return res
+    for j in 2:ksize
+        res = diagCheckDesc(b, 1, j)
+        res != 0 && return res
+        res = diagCheckDesc(b, j, 1)
+        res != 0 && return res
+    end
+    # ascending
+    # TODO: TU SKONCZYLEM
+    # ...
+    # else
+    return 0
+end
+
 g = main()
+
+states = Int8[0 0 0 0 0 0;
+              0 0 0 0 0 0;
+              0 0 1 0 0 0;
+              0 0 0 1 0 0;
+              0 0 0 0 1 0;
+              0 0 0 0 0 1]
+numbs = Int8[1 2 3 4 5 6; 7 8 9 10 11 12; 13 14 15 16 17 18; 19 20 21 22 23 24; 25 26 27 28 29 30; 31 32 33 34 35 36]
+
+tmp = Board(states, row=4)
+println(diagcheck(tmp))
