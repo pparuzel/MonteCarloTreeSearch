@@ -66,11 +66,11 @@ using Base
 abstract type Game end
 
 mutable struct Board <: Game
-    xdim::Int64
-    turn::Int64
+    xdim::Int64 # determined by states
+    turn::Int64 # determined by states
     row::Int64
     states::Array{Int8, 2}
-    isrunning::Bool
+    isrunning::Bool # determined by states
     players::Tuple
     tree::Tree
     ptr::Node
@@ -565,3 +565,5 @@ numbs = Int8[1 2 3 4 5 6; 7 8 9 10 11 12; 13 14 15 16 17 18; 19 20 21 22 23 24; 
 
 tmp = Board(states, row=4)
 println(diagcheck(tmp))
+
+# TODO: REMEMBER TO REMOVE TRANSPOSITIONS!!!
