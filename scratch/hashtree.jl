@@ -1,3 +1,5 @@
+# WARNING: Node does not copy states passed in constructor
+
 struct Node
     states::Array{Int8, 2}
     parent::Union{Node, Void}
@@ -12,13 +14,11 @@ statsMap = Dict{Array{Int8, 2}, Tuple{Int64, Int64}}()
 
 struct Tree
     root::Node
+    ptr::Node
 
     function Tree(width::Int)
-        # add = function(parent::Node)
-        #     push!(parent.children, Node(parent))
-        # end
-
-        this = new(Node(zeros(Int8, (width, width)), nothing), add)
+        n = Node(zeros(Int8, (width, width)), nothing)
+        this = new(n, n)
 
         for i in 1:width^2
             states = zeros(Int8, (width, width))
@@ -28,10 +28,27 @@ struct Tree
 
         return this
     end
+
+    function Tree(states::Array{Int8, 2}, playerid::Int)
+        n = Node(copy(states), nothing)
+        this = new(n, n)
+        expandnode(n, playerid)
+
+        return this
+    end
 end
 
-function expandnode(parent::Node)
+# WARNING: The order can be column major which MAY cause trouble!
+
+function expandnode(parent::Node, playerid::Int)
     # parent.states
+    for i in 1:(length(parent.states))
+        if parent.states[i] == 0
+            sts = copy(parent.states)
+            sts[i] = playerid
+            push!(parent.children, Node(sts, parent))
+        end
+    end
 end
 
 mutable struct Board
@@ -51,6 +68,8 @@ mutable struct Board
         return this
     end
 
+    # WARNING: NO STATE COPYING HERE!
+
     function Board(states::Array{Int8, 2}; row=3)
         this = new()
         dim = size(states)
@@ -63,7 +82,7 @@ mutable struct Board
         # calculate the turn
         this.turn = 0
         for i in states
-            (i != 0) && (b.turn += 1)
+            (i != 0) && (this.turn += 1)
         end
         this.isrunning = this.turn < this.size ^ 2 && check(this) == 0 ? true : false;
         return this
@@ -114,9 +133,6 @@ function diagCheckDesc(b::Board, x::Int, y::Int)
     while x < b.size && y < b.size
         if b.states[x, y] == b.states[x + 1, y + 1] != 0
             inarow += 1
-            # if inarow >= b.row
-            #     return b.states[x, y]
-            # end
             (inarow >= b.row) && (return b.states[x, y])
         else
             inarow = 1
@@ -200,13 +216,12 @@ end
 function quietcopy(b::Board)
     this = Board(b.size, row=b.row)
     this.states = copy(b.states)
-    this.row = b.row
     this.turn = b.turn
     this.isrunning = this.turn < this.size ^ 2 && check(this) == 0 ? true : false;
     return this
 end
 
-# (WARNING #001)
+# TODO: BE CAREFUL! (WARNING #001)
 
 function reset!(b::Board, states::Array{Int8})
     b.states = states
@@ -219,10 +234,10 @@ function reset!(b::Board, states::Array{Int8})
     nothing
 end
 
-function incrTpl(d::Dict, pos::Int; a=1, b=1)
-    d[pos] =
+function incrTpl(d::Dict{Array{Int8,2},Tuple{Int,Int}}, key::Array{Int8,2}; a=1, b=1)
+    d[key] =
     let
-        x = get(d, pos, (0, 0));
+        x = get(d, key, (0, 0));
         (x[1]+a, x[2]+b);
     end
 end
@@ -232,16 +247,41 @@ end
 
 function nodemove!(board::Board, pos::Int; nocheck=false)
     mv = 0
-    for i in 1:board.size^2
+    for i in 1:length(board.states)
         if board.states[i] == 0
             mv += 1
-            (mv == pos) && (return (nocheck ? nocheck_move(b, i) : move(b, i)))
+            (mv == pos) && (nocheck ? (return nocheck_move(board, i)) : (return move(board, i)))
         end
     end
-    throw("Nodemove is broken!")
+    showgame(board)
+    throw("Nodemove is broken! pos:$(pos) $(board)")
 end
 
 # WARNING: UCT WORKS DIFFERENTLY NOW
+
+function UCT(ptr::Node; γ=sqrt(2))::Float64
+    # Upper Confidence Bound
+    # applied to Trees formula
+
+    # wins = ptr.wins
+    # sims = ptr.sims
+
+    wins, sims = get(statsMap, ptr.states, (0, 0))
+    if ptr.parent == nothing
+        return 0.0
+    else
+        parentsims = get(statsMap, ptr.parent.states, (0, 0))[2]
+    end
+    if parentsims == 0
+        return 0.0
+    end
+    if sims == 0
+        return γ * sqrt(log(parentsims))
+    end
+    return wins / sims + γ * sqrt(log(parentsims) / sims)
+end
+
+# TODO: SHOULD BE NODEMOVE WITHOUT CHECKING
 
 function selection(ptr::Node, game::Board)::Node
     # Select the most promising node
@@ -252,7 +292,7 @@ function selection(ptr::Node, game::Board)::Node
         # println("Okay, we have $([p for p in ptr.children]). Which one is the best?")
         best_i = indmax(UCT.(ptr.children))
         ptr = ptr.children[best_i]
-        nodemove!(game, best_i, nocheck=true)
+        nodemove!(game, best_i)
     end
     return ptr
 end
@@ -269,7 +309,7 @@ function expansion(ptr::Node, game::Board)
     newlen = length(ptr.parent.children) - 1
     # WARNING: This may be a wrong idea
     # ptr.children = Node[Node(ptr) for i in 1:newlen]
-    expandnode(ptr)
+    expandnode(ptr, game.turn % 2 == 0 ? 1 : -1)
     move_i = rand(1:newlen)
     ptr = ptr.children[move_i]
     winner = nodemove!(game, move_i)
@@ -312,7 +352,7 @@ function ai_turn(t::Tree, game::Board; timeLimit=1)
     t0 = time_ns()
     # for i in 1:10000
     while time_ns() - t0 < timeLimit
-        reset!(g, game.states)
+        reset!(g, copy(game.states))
         ptr = selection(t.ptr, g)
         ptr, winner = expansion(ptr, g)
         winner = simulation(g, winner)
@@ -320,7 +360,8 @@ function ai_turn(t::Tree, game::Board; timeLimit=1)
     end
 
     # select_best(game, update=true)
-    println("Best move would be...")
+    println("What should I pick hmm...")
+    # depth(t.ptr, 1)
 
     nothing
 end
@@ -351,5 +392,31 @@ function select_best(board::Board; update=false)
     end
     nothing
 end
+
+# Node output
+
+# Base.show(io::IO, x::Node) = print(io, "Node($(x.wins)/$(x.sims), $(length(x.children))$(x.parent == nothing ? ", root" : ""))")
+# Base.show(io::IO, x::Node) = print(io, "Node($(x.states), $(length(x.children))$(x.parent == nothing ? ", root" : ""))")
+Base.show(io::IO, x::Node) = print(io, "Node(", get(statsMap, x.states, "null"), ", $(length(x.children))$(x.parent == nothing ? ", root" : ""))")
+
+function __show_node__(io::IO, node::Node, level=0)
+    println(io, "-" ^ 2level, node)
+    for n in node.children
+        __show_node__(io, n, level + 1)
+    end
+end
+
+function Base.show(io::IO, t::Tree)
+    __show_node__(io, t.root)
+end
+
+function depth(node::Node, _depth::Int64, level=0)
+    (_depth == level) && println("-" ^ 2level, node)
+    for n in node.children
+        depth(n, _depth, level + 1)
+    end
+    nothing
+end
+
 
 nothing
