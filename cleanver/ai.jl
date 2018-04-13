@@ -26,7 +26,7 @@ function uctIndex(parent; η = 2)
     θ = sqrt(η * log(parent.sims + 1))
     for i in 1:length(parent.children)
         ch = parent.children[i]
-        uctval = ch.wins / (ch.sims + 1) + θ * sqrt(1 / ch.sims)
+        uctval = ch.wins / (ch.sims + 1) + θ * sqrt(1 / (ch.sims + 1))
         if uctmax < uctval
             uctmax = uctval
             uctmax_i = i
@@ -36,6 +36,8 @@ function uctIndex(parent; η = 2)
 end
 
 coinflip() = Int(rand(Bool))
+
+UCT(ch) = ch.wins / (ch.sims + 1) + sqrt(log(ch.parent.sims + 1) / (ch.sims + 1))
 
 function mcts(tree::Tree, game::Game; seconds=-1)
     ptr = tree.ptr
