@@ -18,7 +18,7 @@ function makecopy(g::Game)
     return Game(copy(g.states), g.turn, g.size, g.inarow, g.isrunning)
 end
 
-function nodemove(g::Game, pos::Int)
+function nodemove(g::Game, pos::Int; with_check=true)
     # DEBUG
     if pos > (g.size^2 - g.turn)
         throw("illegal nodemove: $(pos). position is unavailable")
@@ -28,7 +28,7 @@ function nodemove(g::Game, pos::Int)
         for i in 1:length(g.states)
             if g.states[i] == 0
                 mv += 1
-                (mv == pos) && (return legalmove(g, i))
+                (mv == pos) && (return legalmove(g, i, with_check=with_check))
             end
         end
     end

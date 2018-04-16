@@ -37,8 +37,6 @@ end
 
 coinflip() = Int(rand(Bool))
 
-UCT(ch) = ch.wins / (ch.sims + 1) + sqrt(log(ch.parent.sims + 1) / (ch.sims + 1))
-
 function mcts(tree::Tree, game::Game; seconds=-1)
     ptr = tree.ptr
     g = makecopy(game)
@@ -63,9 +61,9 @@ function mcts(tree::Tree, game::Game; seconds=-1)
             winner = nodemove(g, move_i)
         end
         # NOTE: simulation
-        gsize = g.size ^ 2
+        flatsize = g.size ^ 2
         while g.isrunning
-            winner = nodemove(g, rand(1:gsize - g.turn))
+            winner = nodemove(g, rand(1:flatsize - g.turn))
         end
         # NOTE: backpropagation
         increment = winner == 0 ? coinflip() : 1
