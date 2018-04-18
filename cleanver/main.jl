@@ -67,7 +67,7 @@ end
 
 function debug()
     # g = Game(Int8[-1 0 0 0; 0 1 -1 1; 0 1 0 0; 1 -1 0 0], 7, 4, 3)
-    g = Game(Int8[-1 -1 1 0; 0 1 -1 1; 0 1 0 0; 1 -1 0 0], 9, 4, 3)
+    g = Game(Int8[-1 0 0 1; 1 0 0 0; -1 0 1 -1; 1 -1 0 1], 9, 4, 3)
     ai1 = Tree(7)
     ai2 = Tree(7)
     while g.isrunning
