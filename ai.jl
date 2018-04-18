@@ -1,10 +1,13 @@
 mutable struct Node
+    key::Int
     wins::Int
     sims::Int
+    winsAMAF::Int
+    simsAMAF::Int
     parent::Union{Node, Void}
     children::Array{Node, 1}
 
-    Node(parent::Union{Node, Void}) = new(0, 0, parent, [])
+    Node(key::Int, parent::Union{Node, Void}) = new(key, 0, 0, 0, 0, parent, [])
 end
 
 mutable struct Tree
@@ -12,21 +15,29 @@ mutable struct Tree
     ptr::Node
 
     function Tree(width::Int)
-        root = Node(nothing)
+        root = Node(-1, nothing)
         for i in 1:width
-            push!(root.children, Node(root))
+            push!(root.children, Node(i, root))
         end
         return new(root, root)
     end
 end
 
-function uctIndex(parent; η = 2)
+function uctIndex(parent; exploration_rate=1, rave_param_squared=0.01)
     uctmax = 0
     uctmax_i = 1
-    θ = sqrt(η * log(parent.sims + 1))
+    θ = exploration_rate * sqrt(log(parent.sims + 1))
     for i in 1:length(parent.children)
         ch = parent.children[i]
-        uctval = ch.wins / (ch.sims + 1) + θ * sqrt(1 / (ch.sims + 1))
+        n = ch.sims
+        ñ = ch.simsAMAF
+        if ñ == 0
+            β = 0
+        else
+            β = ñ / (n + ñ + 4 * rave_param_squared * n * ñ)
+        end
+        uctval = (1 - β) * ch.wins / (n + 1) + (β * ch.winsAMAF / (ñ + 1)) + θ * sqrt(1 / (n + 1))
+        # uctval = ch.wins / (n + 1) + θ * sqrt(1 / (n + 1))
         if uctmax < uctval
             uctmax = uctval
             uctmax_i = i
@@ -40,37 +51,57 @@ coinflip() = Int(rand(Bool))
 function mcts(tree::Tree, game::Game; seconds=-1)
     ptr = tree.ptr
     g = makecopy(game)
+    flatsize = g.size ^ 2
     seconds *= 1e9
     t0 = time_ns()
     while time_ns() - t0 < seconds
         g = makecopy(game)
+        movekeys = (Int[], Int[])
+        INDEX = 1
         # NOTE: selection
         while !isempty(ptr.children)
             best_i = uctIndex(ptr)
             ptr = ptr.children[best_i]
-            nodemove(g, best_i)
+            legalmove(g, ptr.key)
+            push!(movekeys[INDEX], ptr.key)
+            INDEX = (INDEX % 2) + 1
         end
         # NOTE: expansion
         """ check if game ended here """
         winner = check(g)
         if g.isrunning
-            newlen = length(ptr.parent.children) - 1
-            ptr.children = Node[Node(ptr) for i in 1:newlen]
-            move_i = rand(1:newlen)
-            ptr = ptr.children[move_i]
-            winner = nodemove(g, move_i)
+            for node in ptr.parent.children
+                (node.key == ptr.key) && continue
+                push!(ptr.children, Node(node.key, ptr))
+            end
+            shuffled = shuffle(ptr.children)
+            ptr = shuffled[1]
+            winner = legalmove(g, ptr.key)
+            push!(movekeys[INDEX], ptr.key)
+            INDEX = (INDEX % 2) + 1
         end
         # NOTE: simulation
-        flatsize = g.size ^ 2
+        shff_i = 2
         while g.isrunning
-            winner = nodemove(g, rand(1:flatsize - g.turn))
+            winner = legalmove(g, shuffled[shff_i].key)
+            push!(movekeys[INDEX], ptr.key)
+            INDEX = (INDEX % 2) + 1
+            shff_i += 1
         end
         # NOTE: backpropagation
         increment = winner == 0 ? coinflip() : 1
         while ptr != tree.ptr
             ptr.sims += 1
             ptr.wins += increment
+            for p in ptr.parent.children
+                (p == ptr) && continue
+                if p.key in movekeys[INDEX]
+                    p.simsAMAF += 1
+                    p.winsAMAF += increment
+                end
+            end
             ptr = ptr.parent
+            INDEX = (INDEX % 2) + 1
             increment = (increment + 1) % 2
         end
         ptr.sims += 1
