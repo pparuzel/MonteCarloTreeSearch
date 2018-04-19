@@ -1,3 +1,5 @@
+include("config.jl")
+
 mutable struct Node
     key::Int
     wins::Int
@@ -13,20 +15,26 @@ end
 mutable struct Tree
     root::Node
     ptr::Node
+    exploration_rate::Float64
+    rave_squared::Float64
 
-    function Tree(width::Int)
+    function Tree(width::Int; explrate=1, rave=0.1)
         root = Node(-1, nothing)
         for i in 1:width
             push!(root.children, Node(i, root))
         end
-        return new(root, root)
+        return new(root, root, explrate, rave^2)
     end
 end
 
-function uctIndex(parent; exploration_rate=1, rave_param_squared=0.01)
+function restart(t::Tree)
+    t.ptr = t.root
+end
+
+function uctIndex(parent, rave_squared, explrate)
     uctmax = 0
     uctmax_i = 1
-    θ = exploration_rate * sqrt(log(parent.sims + 1))
+    θ = explrate * sqrt(log(parent.sims + 1))
     for i in 1:length(parent.children)
         ch = parent.children[i]
         n = ch.sims
@@ -34,10 +42,9 @@ function uctIndex(parent; exploration_rate=1, rave_param_squared=0.01)
         if ñ == 0
             β = 0
         else
-            β = ñ / (n + ñ + 4 * rave_param_squared * n * ñ)
+            β = ñ / (n + ñ + 4 * rave_squared * n * ñ)
         end
         uctval = (1 - β) * ch.wins / (n + 1) + (β * ch.winsAMAF / (ñ + 1)) + θ * sqrt(1 / (n + 1))
-        # uctval = ch.wins / (n + 1) + θ * sqrt(1 / (n + 1))
         if uctmax < uctval
             uctmax = uctval
             uctmax_i = i
@@ -45,8 +52,6 @@ function uctIndex(parent; exploration_rate=1, rave_param_squared=0.01)
     end
     return uctmax_i
 end
-
-coinflip() = Int(rand(Bool))
 
 function mcts(tree::Tree, game::Game; seconds=-1)
     ptr = tree.ptr
@@ -60,7 +65,7 @@ function mcts(tree::Tree, game::Game; seconds=-1)
         INDEX = 1
         # NOTE: selection
         while !isempty(ptr.children)
-            best_i = uctIndex(ptr)
+            best_i = uctIndex(ptr, tree.rave_squared, tree.exploration_rate)
             ptr = ptr.children[best_i]
             legalmove(g, ptr.key)
             push!(movekeys[INDEX], ptr.key)
@@ -111,7 +116,7 @@ end
 
 # Node output
 
-Base.show(io::IO, x::Node) = print(io, "Node($(x.wins)/$(x.sims), $(length(x.children))$(x.parent == nothing ? ", root" : ""))")
+Base.show(io::IO, x::Node) = print(io, "Node($(x.wins+x.winsAMAF)/$(x.sims+x.simsAMAF), $(length(x.children))$(x.parent == nothing ? ", root" : ""))")
 
 function __show_node__(io::IO, node::Node, level=0)
     println(io, "-" ^ 2level, node)
@@ -121,7 +126,7 @@ function __show_node__(io::IO, node::Node, level=0)
 end
 
 function Base.show(io::IO, t::Tree)
-    __show_node__(io, t.root)
+    print(io, t.root, "…")
 end
 
 function depth(node::Node, _depth::Int64, level=0)
@@ -131,3 +136,5 @@ function depth(node::Node, _depth::Int64, level=0)
     end
     nothing
 end
+
+configure()

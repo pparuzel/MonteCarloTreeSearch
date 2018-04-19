@@ -1,13 +1,13 @@
 # CONFIG
 
-function configure(; ties=:coinflip)
+function configure(; ties=:coinflip;)
     global coinflip
     if ties == :coinflip
-        coinflip = function() return Int(rand(Bool)) end
+        coinflip() = Int(rand(Bool))
     elseif ties == :loss
-        coinflip = function() return 0 end
+        coinflip() = 0
     elseif ties == :win
-        coinflip = function() return 1 end
+        coinflip() = 1
     else
         nothing
     end

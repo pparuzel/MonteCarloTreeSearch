@@ -14,6 +14,8 @@ mutable struct Game
     end
 end
 
+Base.show(io::IO, g::Game) = print(io, "Game<$(g.size)x$(g.size)> $(g.isrunning ? "running" : "gameover")…")
+
 function makecopy(g::Game)
     return Game(copy(g.states), g.turn, g.size, g.inarow, g.isrunning)
 end
