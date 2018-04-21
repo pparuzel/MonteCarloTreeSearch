@@ -5,11 +5,11 @@ mutable struct Game
     inarow::Int
     isrunning::Bool
 
-    function Game(size; row=3)
+    function Game(size::Int; row=3)
         return new(zeros(Int8, size, size), 0, size, row, true)
     end
 
-    function Game(states::Array{Int8, 2}, turn, size, row, active=true)
+    function Game(states::Array{Int8, 2}, turn::Int, size::Int, row::Int, active=true)
         return new(states, turn, size, row, active)
     end
 end
@@ -21,10 +21,10 @@ function makecopy(g::Game)
 end
 
 function nodemove(g::Game, pos::Int; with_check=true)
-    # DEBUG
-    if pos > (g.size^2 - g.turn)
-        throw("illegal nodemove: $(pos). position is unavailable")
-    end
+    # # DEBUG
+    # if pos > (g.size^2 - g.turn)
+    #     throw("illegal nodemove: $(pos). position is unavailable")
+    # end
     for i in 1:length(g.states)
         mv = 0
         for i in 1:length(g.states)
@@ -38,13 +38,13 @@ end
 
 # NOTE: Tested
 function legalmove(g::Game, pos::Int; with_check=true)
-    # DEBUG
-    if !g.isrunning
-        throw("illegal move: game is over ($pos)")
-    end
-    if g.states[pos] != 0
-        throw("illegal move: $(pos). position is taken")
-    end
+    # # DEBUG
+    # if !g.isrunning
+    #     throw("illegal move: game is over ($pos)")
+    # end
+    # if g.states[pos] != 0
+    #     throw("illegal move: $(pos). position is taken")
+    # end
     g.states[pos] += g.turn % 2 == 0 ? 1 : -1
     g.turn += 1
     (with_check) && (return check(g))
@@ -57,11 +57,11 @@ function sh(g::Game)
     println("Board")
     for i in 1:length(g.states)
         if g.states[i] == 1
-            print('X')
+            print("X ")
         elseif g.states[i] == -1
-            print('O')
+            print("O ")
         else
-            print('-')
+            print("- ")
         end
         (i % g.size == 0) && println()
     end

@@ -12,13 +12,13 @@ mutable struct Node
     Node(key::Int, parent::Union{Node, Void}) = new(key, 0, 0, 0, 0, parent, [])
 end
 
-mutable struct Tree
+mutable struct Agent
     root::Node
     ptr::Node
     exploration_rate::Float64
     rave_squared::Float64
 
-    function Tree(width::Int; explrate=1, rave=0.1)
+    function Agent(width::Int; explrate=1, rave=0.1)
         root = Node(-1, nothing)
         for i in 1:width
             push!(root.children, Node(i, root))
@@ -27,13 +27,13 @@ mutable struct Tree
     end
 end
 
-function restart(t::Tree)
+function restart(t::Agent)
     t.ptr = t.root
 end
 
 function uctIndex(parent, rave_squared, explrate)
     uctmax = 0
-    uctmax_i = 1
+    uctmax_i = 0
     θ = explrate * sqrt(log(parent.sims + 1))
     for i in 1:length(parent.children)
         ch = parent.children[i]
@@ -50,13 +50,12 @@ function uctIndex(parent, rave_squared, explrate)
             uctmax_i = i
         end
     end
-    return uctmax_i
+    return (uctmax_i == 0 ? rand(1:length(parent.children)) : uctmax_i)
 end
 
-function mcts(tree::Tree, game::Game; seconds=-1)
+function mcts(tree::Agent, game::Game; seconds=-1)
     ptr = tree.ptr
-    g = makecopy(game)
-    flatsize = g.size ^ 2
+    flatsize = game.size ^ 2
     seconds *= 1e9
     t0 = time_ns()
     while time_ns() - t0 < seconds
@@ -67,7 +66,7 @@ function mcts(tree::Tree, game::Game; seconds=-1)
         while !isempty(ptr.children)
             best_i = uctIndex(ptr, tree.rave_squared, tree.exploration_rate)
             ptr = ptr.children[best_i]
-            legalmove(g, ptr.key)
+            legalmove(g, ptr.key, with_check=false)
             push!(movekeys[INDEX], ptr.key)
             INDEX = (INDEX % 2) + 1
         end
@@ -125,7 +124,7 @@ function __show_node__(io::IO, node::Node, level=0)
     end
 end
 
-function Base.show(io::IO, t::Tree)
+function Base.show(io::IO, t::Agent)
     print(io, t.root, "…")
 end
 

@@ -25,7 +25,7 @@ function selectBestOption(t, g; opponent=nothing)
     nodemove(g, best_i)
 end
 
-function ai(t::Tree, g::Game; seconds=1)
+function ai(t::Agent, g::Game; seconds=1)
     mcts(t, g, seconds=seconds)
     selectBestOption(t, g)
     (t, g)
@@ -33,8 +33,8 @@ end
 
 function demo(;size=3, inrow=3, time=(1, 1), one=nothing, two=nothing)
     g = Game(size, row=inrow)
-    one != nothing ? (ai1 = one) : (ai1 = Tree(size^2))
-    two != nothing ? (ai2 = two) : (ai2 = Tree(size^2))
+    one != nothing ? (ai1 = one) : (ai1 = Agent(size^2))
+    two != nothing ? (ai2 = two) : (ai2 = Agent(size^2))
     sh(g)
     while g.isrunning
         mcts(ai1, g, seconds=time[1])
