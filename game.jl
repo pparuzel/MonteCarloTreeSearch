@@ -21,10 +21,6 @@ function makecopy(g::Game)
 end
 
 function nodemove(g::Game, pos::Int; with_check=true)
-    # # DEBUG
-    # if pos > (g.size^2 - g.turn)
-    #     throw("illegal nodemove: $(pos). position is unavailable")
-    # end
     for i in 1:length(g.states)
         mv = 0
         for i in 1:length(g.states)
@@ -38,13 +34,6 @@ end
 
 # NOTE: Tested
 function legalmove(g::Game, pos::Int; with_check=true)
-    # # DEBUG
-    # if !g.isrunning
-    #     throw("illegal move: game is over ($pos)")
-    # end
-    # if g.states[pos] != 0
-    #     throw("illegal move: $(pos). position is taken")
-    # end
     g.states[pos] += g.turn % 2 == 0 ? 1 : -1
     g.turn += 1
     (with_check) && (return check(g))

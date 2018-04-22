@@ -53,8 +53,8 @@ function uctIndex(parent, rave_squared, explrate)
     return (uctmax_i == 0 ? rand(1:length(parent.children)) : uctmax_i)
 end
 
-function mcts(tree::Agent, game::Game; seconds=-1)
-    ptr = tree.ptr
+function mcts(agent::Agent, game::Game; seconds=-1)
+    ptr = agent.ptr
     flatsize = game.size ^ 2
     seconds *= 1e9
     t0 = time_ns()
@@ -64,7 +64,7 @@ function mcts(tree::Agent, game::Game; seconds=-1)
         INDEX = 1
         # NOTE: selection
         while !isempty(ptr.children)
-            best_i = uctIndex(ptr, tree.rave_squared, tree.exploration_rate)
+            best_i = uctIndex(ptr, agent.rave_squared, agent.exploration_rate)
             ptr = ptr.children[best_i]
             legalmove(g, ptr.key, with_check=false)
             push!(movekeys[INDEX], ptr.key)
@@ -94,7 +94,7 @@ function mcts(tree::Agent, game::Game; seconds=-1)
         end
         # NOTE: backpropagation
         increment = winner == 0 ? coinflip() : 1
-        while ptr != tree.ptr
+        while ptr != agent.ptr
             ptr.sims += 1
             ptr.wins += increment
             for p in ptr.parent.children
@@ -113,9 +113,25 @@ function mcts(tree::Agent, game::Game; seconds=-1)
     end
 end
 
-# Node output
+function selectBestOption(t::Agent, g::Game; opponent=nothing)
+    # assign new t.ptr
+    bestsims = 0
+    best_i = 0
+    for i in 1:length(t.ptr.children)
+        child = t.ptr.children[i]
+        if bestsims < child.sims
+            bestsims = child.sims
+            best_i = i
+        end
+    end
+    t.ptr = t.ptr.children[best_i]
+    if opponent != nothing
+        opponent.ptr = opponent.ptr.children[best_i]
+    end
+    nodemove(g, best_i)
+end
 
-Base.show(io::IO, x::Node) = print(io, "Node($(x.wins+x.winsAMAF)/$(x.sims+x.simsAMAF), $(length(x.children))$(x.parent == nothing ? ", root" : ""))")
+# Node output
 
 function __show_node__(io::IO, node::Node, level=0)
     println(io, "-" ^ 2level, node)

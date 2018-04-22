@@ -1,28 +1,10 @@
 include("game.jl")
-include("ai.jl")
+include("agent.jl")
 
 function main()
     game = Game(3)
     legalmove(game, 4)
     sh(game)
-end
-
-function selectBestOption(t, g; opponent=nothing)
-    # assign new t.ptr
-    bestsims = 0
-    best_i = 0
-    for i in 1:length(t.ptr.children)
-        child = t.ptr.children[i]
-        if bestsims < child.sims
-            bestsims = child.sims
-            best_i = i
-        end
-    end
-    t.ptr = t.ptr.children[best_i]
-    if opponent != nothing
-        opponent.ptr = opponent.ptr.children[best_i]
-    end
-    nodemove(g, best_i)
 end
 
 function ai(t::Agent, g::Game; seconds=1)
