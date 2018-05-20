@@ -92,14 +92,7 @@ function canMove(g::Game, numPossible::Int64)
         return false
     end
     if g.count40 > 39
-        g.winner = men[2] > men[1] ? 1 : -1
-        if men[1] == men[2]
-            g.winner = 0
-        elseif men[1] < men[2]
-            g.winner = 1
-        elseif men[2] < men[1]
-            g.winner = -1
-        end
+        g.winner = 0
         return false
     end
     if numPossible > 0
@@ -266,6 +259,14 @@ function getValidMovesAfterHop(g::Game, pos)
 end
 
 function makecopy(g::Game)
+    gcpy = Game(false)
+    gcpy.states = copy(g.states)
+    gcpy.pID = g.pID
+    gcpy.count40 = g.count40
+    gcpy.winner = g.winner
+    gcpy.men = copy(g.men)
+
+    return gcpy
 end
 
 
