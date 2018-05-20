@@ -13,6 +13,21 @@ while canMove(g, length(valid))
     sh(g); @show g.men, g.pID
 end
 
+
+restart(g); valid = getValidMoves(g)
+while canMove(g, length(valid))
+    move(g, rand(valid))
+    sh(g); @show g.lastAction
+    if length(g.lastAction) == 3
+        valid = getValidMovesAfterHop(g, g.lastAction[2])
+        if length(valid) == 0
+            valid = getValidMoves(g)
+        end
+    else
+        valid = getValidMoves(g)
+    end
+end
+
 =#
 
 default_state = Int64[-1 -1 -1 -1; -1 -1 -1 -1;
@@ -26,10 +41,12 @@ mutable struct Game
     count40::Int64
     winner::Union{Int64, Void}
     men::Array{Int64, 1}
+    lastAction::Tuple{Int64,Int64,Vararg{Int64,N} where N}
+    hopMove::Bool
 
     function Game()
         states = copy(default_state)
-        return new(states, 0, 0, nothing, Int64[12, 12])
+        return new(states, 0, 0, nothing, Int64[12, 12], (0, 0), false)
     end
 
     function Game(::Bool)
@@ -44,8 +61,23 @@ function restart(g::Game, state::Array{Int64, 2}=default_state)
     g.winner = nothing
     g.men[1] = 12
     g.men[2] = 12
+    g.lastAction = (0, 0)
+    g.hopMove = false
 
     nothing
+end
+
+function makecopy(g::Game)
+    gcpy = Game(false)
+    gcpy.states = copy(g.states)
+    gcpy.pID = g.pID
+    gcpy.count40 = g.count40
+    gcpy.winner = g.winner
+    gcpy.men = copy(g.men)
+    gcpy.lastAction = g.lastAction
+    gcpy.hopMove = g.hopMove
+
+    return gcpy
 end
 
 function decreaseMen(g::Game, opponent::Int64)
@@ -58,30 +90,89 @@ end
 
 Base.show(io::IO, g::Game) = print(io, "Checkers<8x8>")
 
-function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N}, valid::Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1})
-    player = g.pID
+# function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N}, valid::Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1})
+#     player = g.pID
+#     if length(action) == 2 # normal move
+#         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+#         g.states[action[1]] = 0
+#         g.pID = 1 - g.pID
+#         valid = getValidMoves(g)
+#     elseif length(action) == 3 # attacking move
+#         decreaseMen(g, 1 - player)
+#         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+#         g.states[action[1]] = 0
+#         g.states[action[3]] = 0
+#         g.count40 = -1
+#         valid = getValidMovesAfterHop(g, action[2])
+#         if length(valid) == 0
+#             g.pID = 1 - g.pID
+#             valid = getValidMoves(g)
+#         end
+#     end
+#     g.lastAction = action
+#     g.count40 += 1
+#     return valid
+# end
+
+function updatePlayerID(g::Game)
+    if g.hopMove
+        g.pID = div((-sign(g.states[g.lastAction[2]]) + 1), 2)
+    else
+        g.pID = div((sign(g.states[g.lastAction[2]]) + 1), 2)
+    end
+end
+
+# IMPORTANT NOTE: DO NOT FORGET THAT AFTERHOP PLAYER IS NOT CHANGED!
+# NOTE: Do not use justMove with unless you are 100% sure it is a legal move
+# justMove ignore doesnt know if/which player has hopped before or not
+function justMove(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
+    # NOT UPDATING WHICH PLAYER
     if length(action) == 2 # normal move
         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
         g.states[action[1]] = 0
-        g.pID = 1 - g.pID
-        valid = getValidMoves(g)
+        g.hopMove = false
     elseif length(action) == 3 # attacking move
-        decreaseMen(g, 1 - player)
+        decreaseMen(g, 1 - g.pID)
         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
         g.states[action[1]] = 0
         g.states[action[3]] = 0
         g.count40 = -1
+        g.hopMove = true
+    end
+    g.lastAction = action
+    g.count40 += 1
+end
+
+function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
+    # if length(g.lastAction) == 3 && g.lastAction[2] != action[1]
+    #     g.pID = (sign(g.states[action[1]]) + 1) / 2
+    # end
+    if length(action) == 2 # normal move
+        g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        g.states[action[1]] = 0
+        # @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move"
+        g.pID = 1 - g.pID
+        g.hopMove = false
+        valid = getValidMoves(g)
+    else #if length(action) == 3 # attacking move
+        decreaseMen(g, 1 - g.pID)
+        g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        g.states[action[1]] = 0
+        g.states[action[3]] = 0
+        g.count40 = -1
+        g.hopMove = true
+        # @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move. Action: $(action). $(g.states[action[2]]) ≢ $(g.pID == 0 ? 1 : -1)"
         valid = getValidMovesAfterHop(g, action[2])
         if length(valid) == 0
-            g.pID = 1 - g.pID
             valid = getValidMoves(g)
         end
     end
+    g.lastAction = action
     g.count40 += 1
     return valid
 end
 
-function canMove(g::Game, numPossible::Int64)
+function canMove(g::Game)
     men = g.men
     if men[2] == 0
         g.winner = 1
@@ -95,12 +186,7 @@ function canMove(g::Game, numPossible::Int64)
         g.winner = 0
         return false
     end
-    if numPossible > 0
-        return true
-    else
-        g.winner = g.pID == 0 ? -1 : 1
-        return false
-    end
+    return true
 end
 
 # Kings' strip
@@ -219,6 +305,9 @@ function getValidMoves(g::Game)
         end # for i
     end # if player
     trimIfAttack(valid)
+    if length(valid) == 0
+        g.winner = g.pID == 0 ? -1 : 1
+    end
     return valid
 end
 
@@ -255,20 +344,13 @@ function getValidMovesAfterHop(g::Game, pos)
             end
         end
     end
+    # GETTER MODIFIES THE STATE
+    if length(valid) == 0
+        g.hopMove = false
+        g.pID = div((sign(board[pos]) + 1), 2)
+    end
     return valid
 end
-
-function makecopy(g::Game)
-    gcpy = Game(false)
-    gcpy.states = copy(g.states)
-    gcpy.pID = g.pID
-    gcpy.count40 = g.count40
-    gcpy.winner = g.winner
-    gcpy.men = copy(g.men)
-
-    return gcpy
-end
-
 
 function play()
     s = ""
@@ -292,11 +374,18 @@ function sh(game::Game)
             return "◆"
         elseif c == -2
             return "◇"
+        elseif c == 9
+            return "*"
         else
             return " "
         end
     end
-    a = game.states.'
+    a = copy(game.states)
+    last = game.lastAction
+    if last[1] != 0
+        a[last[1]] = 9
+    end
+    a = a.'
     println("      1   2   3   4   5   6   7   8")
     println("    ╔═══╤═══╤═══╤═══╤═══╤═══╤═══╤═══╗")
     print("  A ║   │ $(p(a[1])) │   │ ")

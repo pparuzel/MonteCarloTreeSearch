@@ -1,0 +1,422 @@
+        - #=
+        - 
+        - g = Game()
+        - valid = getValidMoves(g)
+        - while canMove(g, length(valid))
+        -     valid = move(g, rand(valid), valid)
+        - end
+        - 
+        - 
+        - while canMove(g, length(valid))
+        -     println("Ruch $(g.pID == 0 ? "bialego" : "czarnego")")
+        -     valid = move(g, rand(valid), valid)
+        -     sh(g); @show g.men, g.pID
+        - end
+        - 
+        - 
+        - restart(g); valid = getValidMoves(g)
+        - while canMove(g, length(valid))
+        -     move(g, rand(valid))
+        -     sh(g); @show g.lastAction
+        -     if length(g.lastAction) == 3
+        -         valid = getValidMovesAfterHop(g, g.lastAction[2])
+        -         if length(valid) == 0
+        -             valid = getValidMoves(g)
+        -         end
+        -     else
+        -         valid = getValidMoves(g)
+        -     end
+        - end
+        - 
+        - =#
+        - 
+        - default_state = Int64[-1 -1 -1 -1; -1 -1 -1 -1;
+        -                       -1 -1 -1 -1;  0  0  0  0;
+        -                        0  0  0  0;  1  1  1  1;
+        -                        1  1  1  1;  1  1  1  1]
+        - 
+        - mutable struct Game
+        -     states::Array{Int64, 2}
+        -     pID::Int64
+        -     count40::Int64
+        -     winner::Union{Int64, Void}
+        -     men::Array{Int64, 1}
+        -     lastAction::Tuple{Int64,Int64,Vararg{Int64,N} where N}
+        -     hopMove::Bool
+        - 
+        -     function Game()
+        0         states = copy(default_state)
+        0         return new(states, 0, 0, nothing, Int64[12, 12], (0, 0), false)
+        -     end
+        - 
+        -     function Game(::Bool)
+        -         return new()
+        -     end
+        - end
+        - 
+        - function restart(g::Game, state::Array{Int64, 2}=default_state)
+        -     g.states = copy(state)
+        -     g.pID = 0
+        -     g.count40 = 0
+        -     g.winner = nothing
+        -     g.men[1] = 12
+        -     g.men[2] = 12
+        -     g.lastAction = (0, 0)
+        -     g.hopMove = false
+        - 
+        -     nothing
+        - end
+        - 
+        - function makecopy(g::Game)
+    64000     gcpy = Game(false)
+   400000     gcpy.states = copy(g.states)
+        0     gcpy.pID = g.pID
+        0     gcpy.count40 = g.count40
+        0     gcpy.winner = g.winner
+    96000     gcpy.men = copy(g.men)
+        0     gcpy.lastAction = g.lastAction
+        0     gcpy.hopMove = g.hopMove
+        - 
+        0     return gcpy
+        - end
+        - 
+        - function decreaseMen(g::Game, opponent::Int64)
+        0     if opponent > 0
+        0         g.men[2] -= 1
+        -     else
+        0         g.men[1] -= 1
+        -     end
+        - end
+        - 
+        - Base.show(io::IO, g::Game) = print(io, "Checkers<8x8>")
+        - 
+        - # function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N}, valid::Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1})
+        - #     player = g.pID
+        - #     if length(action) == 2 # normal move
+        - #         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        - #         g.states[action[1]] = 0
+        - #         g.pID = 1 - g.pID
+        - #         valid = getValidMoves(g)
+        - #     elseif length(action) == 3 # attacking move
+        - #         decreaseMen(g, 1 - player)
+        - #         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        - #         g.states[action[1]] = 0
+        - #         g.states[action[3]] = 0
+        - #         g.count40 = -1
+        - #         valid = getValidMovesAfterHop(g, action[2])
+        - #         if length(valid) == 0
+        - #             g.pID = 1 - g.pID
+        - #             valid = getValidMoves(g)
+        - #         end
+        - #     end
+        - #     g.lastAction = action
+        - #     g.count40 += 1
+        - #     return valid
+        - # end
+        - 
+        - function updatePlayerID(g::Game)
+        0     if g.hopMove
+        0         g.pID = div((-sign(g.states[g.lastAction[2]]) + 1), 2)
+        -     else
+        0         g.pID = div((sign(g.states[g.lastAction[2]]) + 1), 2)
+        -     end
+        - end
+        - 
+        - # IMPORTANT NOTE: DO NOT FORGET THAT AFTERHOP PLAYER IS NOT CHANGED!
+        - # NOTE: Do not use justMove with unless you are 100% sure it is a legal move
+        - # justMove ignore doesnt know if/which player has hopped before or not
+        - function justMove(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
+        -     # NOT UPDATING WHICH PLAYER
+   556568     if length(action) == 2 # normal move
+    91956         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        0         g.states[action[1]] = 0
+        0         g.hopMove = false
+        0     elseif length(action) == 3 # attacking move
+        0         decreaseMen(g, 1 - g.pID)
+        0         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        0         g.states[action[1]] = 0
+        0         g.states[action[3]] = 0
+        0         g.count40 = -1
+        0         g.hopMove = true
+        -     end
+   114720     g.lastAction = action
+        0     g.count40 += 1
+        - end
+        - 
+        - function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
+        -     # if length(g.lastAction) == 3 && g.lastAction[2] != action[1]
+        -     #     g.pID = (sign(g.states[action[1]]) + 1) / 2
+        -     # end
+  1490220     if length(action) == 2 # normal move
+        0         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        0         g.states[action[1]] = 0
+        0         @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move"
+        0         g.pID = 1 - g.pID
+        0         g.hopMove = false
+        0         valid = getValidMoves(g)
+        -     else #if length(action) == 3 # attacking move
+        0         decreaseMen(g, 1 - g.pID)
+        0         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+        0         g.states[action[1]] = 0
+        0         g.states[action[3]] = 0
+        0         g.count40 = -1
+        0         g.hopMove = true
+        0         @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move. Action: $(action). $(g.states[action[2]]) ≢ $(g.pID == 0 ? 1 : -1)"
+        0         valid = getValidMovesAfterHop(g, action[2])
+        0         if length(valid) == 0
+        0             valid = getValidMoves(g)
+        -         end
+        -     end
+  1555584     g.lastAction = action
+        0     g.count40 += 1
+        0     return valid
+        - end
+        - 
+        - function canMove(g::Game, numPossible::Int64)
+        0     men = g.men
+        0     if men[2] == 0
+        0         g.winner = 1
+        0         return false
+        -     end
+        0     if men[1] == 0
+        0         g.winner = -1
+        0         return false
+        -     end
+        0     if g.count40 > 39
+        0         g.winner = 0
+        0         return false
+        -     end
+        0     if numPossible > 0
+        0         return true
+        -     else
+        0         g.winner = g.pID == 0 ? -1 : 1
+        0         return false
+        -     end
+        - end
+        - 
+        - # Kings' strip
+        - kingStrip = (1, 9, 17, 25, 8, 16, 24, 32)
+        - 
+        - # D_HD_U_HU
+        - actions = Array{Tuple,1}[
+        -         [(10, 2), (11,), Tuple{}(), Tuple{}()],
+        -         [(3,), (12,), (1,), Tuple{}()],
+        -         [(12, 4), (13,), (10, 2), (9,)],
+        -         [(5,), (14,), (3,), (10,)],
+        -         [(14, 6), (15,), (12, 4), (11,)],
+        -         [(7,), (16,), (5,), (12,)],
+        -         [(8, 16), Tuple{}(), (14, 6), (13,)],
+        -         [Tuple{}(), Tuple{}(), (7,), (14,)],
+        -         [(10, 18), (3, 19), Tuple{}(), Tuple{}()],
+        -         [(3, 11), (4, 20), (1, 9), Tuple{}()],
+        -         [(12, 20), (5, 21), (10, 18), (1, 17)],
+        -         [(5, 13), (6, 22), (3, 11), (2, 18)],
+        -         [(14, 22), (7, 23), (12, 20), (3, 19)],
+        -         [(7, 15), (8, 24), (5, 13), (4, 20)],
+        -         [(16, 24), Tuple{}(), (14, 22), (5, 21)],
+        -         [Tuple{}(), Tuple{}(), (7, 15), (6, 22)],
+        -         [(18, 26), (11, 27), Tuple{}(), Tuple{}()],
+        -         [(11, 19), (12, 28), (9, 17), Tuple{}()],
+        -         [(20, 28), (13, 29), (18, 26), (9, 25)],
+        -         [(13, 21), (14, 30), (11, 19), (10, 26)],
+        -         [(22, 30), (15, 31), (20, 28), (11, 27)],
+        -         [(15, 23), (16, 32), (13, 21), (12, 28)],
+        -         [(24, 32), Tuple{}(), (22, 30), (13, 29)],
+        -         [Tuple{}(), Tuple{}(), (15, 23), (14, 30)],
+        -         [(26,), (19,), Tuple{}(), Tuple{}()],
+        -         [(19, 27), (20,), (17, 25), Tuple{}()],
+        -         [(28,), (21,), (26,), (17,)],
+        -         [(21, 29), (22,), (19, 27), (18,)],
+        -         [(30,), (23,), (28,), (19,)],
+        -         [(23, 31), (24,), (21, 29), (20,)],
+        -         [(32,), Tuple{}(), (30,), (21,)],
+        -         [Tuple{}(), Tuple{}(), (23, 31), (22,)]
+        - ]
+        - 
+        - function trimIfAttack(moves)
+        0     if length(moves) > 0 && length(moves[end]) == 3
+        0         filter!(x -> (length(x) == 3), moves)
+        -     end
+        - end
+        - 
+        - function getValidMoves(g::Game)
+        -     # PLAYER MUST HOP
+        0     player = g.pID
+ 19708416     valid = Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}()
+        0     board = g.states
+        0     if player == 1
+        0         hop = false
+        0         for i in 1:length(board)
+        0             if board[i] == 0
+        -                 # D_HD_U_HU
+        0                 A = actions[i]
+ 33711424                 for i4 in 1:length(A[4])
+        0                     if board[A[4][i4]] < 0 && board[A[3][i4]] > 0
+   572752                         push!(valid, (A[4][i4], i, A[3][i4]))
+        0                         hop = true
+        -                     end
+        -                 end
+ 33513168                 for i2 in 1:length(A[2])
+        0                     if board[A[2][i2]] < -1 && board[A[1][i2]] > 0
+    54704                         push!(valid, (A[2][i2], i, A[1][i2]))
+        0                         hop = true
+        -                     end
+        -                 end
+        0                 if !hop
+ 34969024                     for i3 in 1:length(A[3])
+        0                         if board[A[3][i3]] < 0
+  9695264                             push!(valid, (A[3][i3], i))
+        -                         end
+        -                     end
+ 35087008                     for i1 in 1:length(A[1])
+        0                         if board[A[1][i1]] < -1
+  1693488                             push!(valid, (A[1][i1], i))
+        -                         end
+        -                     end
+        -                 end # not hop
+        -             end # if board[i] == 0
+        -         end # for i
+        -     else # if
+        0         hop = false
+        0         for i in 1:length(board)
+        0             if board[i] == 0
+        -                 # D_HD_U_HU
+        0                 A = actions[i]
+ 33673888                 for i2 in 1:length(A[2])
+        0                     if board[A[2][i2]] > 0 && board[A[1][i2]] < 0
+   631111                         push!(valid, (A[2][i2], i, A[1][i2]))
+        0                         hop = true
+        -                     end
+        -                 end
+ 33598368                 for i4 in 1:length(A[4])
+        0                     if board[A[4][i4]] > 1 && board[A[3][i4]] < 0
+    51664                         push!(valid, (A[4][i4], i, A[3][i4]))
+        0                         hop = true
+        -                     end
+        -                 end
+        0                 if !hop
+ 34973664                     for i1 in 1:length(A[1])
+        0                         if board[A[1][i1]] > 0
+  9436576                             push!(valid, (A[1][i1], i))
+        -                         end
+        -                     end
+ 34735936                     for i3 in 1:length(A[3])
+        0                         if board[A[3][i3]] > 1
+  1630880                             push!(valid, (A[3][i3], i))
+        -                         end
+        -                     end
+        -                 end # not hop
+        -             end # if board[i] == 0
+        -         end # for i
+        -     end # if player
+        0     trimIfAttack(valid)
+        0     return valid
+        - end
+        - 
+        - function getValidMovesAfterHop(g::Game, pos)
+        0     player = g.pID
+  6053216     valid = Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}()
+        0     board = g.states
+        -     # D_HD_U_HU
+        0     A = actions[pos]
+        0     if player == 1
+   554304         for i2 in 1:length(A[2])
+        0             if board[A[2][i2]] == 0 && board[A[1][i2]] > 0
+    92944                 push!(valid, (pos, A[2][i2], A[1][i2]))
+        -             end
+        -         end
+        0         if board[pos] < -1
+   117472             for i4 in 1:length(A[4])
+        0                 if board[A[4][i4]] == 0 && board[A[3][i4]] > 0
+    23424                     push!(valid, (pos, A[4][i4], A[3][i4]))
+        -                 end
+        -             end
+        -         end
+        -     else # player > 0
+   545664         for i4 in 1:length(A[4])
+        0             if board[A[4][i4]] == 0 && board[A[3][i4]] < 0
+    88992                 push!(valid, (pos, A[4][i4], A[3][i4]))
+        -             end
+        -         end
+        0         if board[pos] > 1
+   122400             for i2 in 1:length(A[2])
+        0                 if board[A[2][i2]] == 0 && board[A[1][i2]] < 0
+    24352                     push!(valid, (pos, A[2][i2], A[1][i2]))
+        -                 end
+        -             end
+        -         end
+        -     end
+        -     # GETTER MODIFIES THE STATE
+        0     if length(valid) == 0
+        0         g.hopMove = false
+        0         g.pID = div((sign(board[pos]) + 1), 2)
+        -     end
+        0     return valid
+        - end
+        - 
+        - function play()
+        -     s = ""
+        -     while s != "q"
+        -         s = readline(STDIN)
+        -         x, y = Int(s[1]) - 96, s[2:end]
+        -         y = parse(Int64, y)
+        -         res = 8div(y - 1, 2) + x
+        - 
+        -         println("Playing $s ($res)")
+        -     end
+        - end
+        - 
+        - function sh(game::Game)
+        -     function p(c::Int64)
+        -         if c == 1
+        -             return "●"
+        -         elseif c == -1
+        -             return "□"
+        -         elseif c == 2
+        -             return "◆"
+        -         elseif c == -2
+        -             return "◇"
+        -         elseif c == 9
+        -             return "*"
+        -         else
+        -             return " "
+        -         end
+        -     end
+        -     a = copy(game.states)
+        -     last = game.lastAction
+        -     if last[1] != 0
+        -         a[last[1]] = 9
+        -     end
+        -     a = a.'
+        -     println("      1   2   3   4   5   6   7   8")
+        -     println("    ╔═══╤═══╤═══╤═══╤═══╤═══╤═══╤═══╗")
+        -     print("  A ║   │ $(p(a[1])) │   │ ")
+        -     println("$(p(a[2])) │   │ $(p(a[3])) │   │ $(p(a[4])) ║")
+        -     println("    ╟───┼───┼───┼───┼───┼───┼───┼───╢")
+        - 
+        -     print("  B ║ $(p(a[5])) │   │ $(p(a[6])) │   ")
+        -     println("│ $(p(a[7])) │   │ $(p(a[8])) │   ║")
+        -     println("    ╟───┼───┼───┼───┼───┼───┼───┼───╢")
+        - 
+        -     print("  C ║   │ $(p(a[9])) │   │ ")
+        -     println("$(p(a[10])) │   │ $(p(a[11])) │   │ $(p(a[12])) ║")
+        -     println("    ╟───┼───┼───┼───┼───┼───┼───┼───╢")
+        - 
+        -     println("  D ║ $(p(a[13])) │   │ $(p(a[14])) │   │ $(p(a[15])) │   │ $(p(a[16])) │   ║")
+        -     println("    ╟───┼───┼───┼───┼───┼───┼───┼───╢")
+        -     println("  E ║   │ $(p(a[17])) │   │ $(p(a[18])) │   │ $(p(a[19])) │   │ $(p(a[20])) ║")
+        -     println("    ╟───┼───┼───┼───┼───┼───┼───┼───╢")
+        - 
+        -     print("  F ║ $(p(a[21])) │   │ $(p(a[22])) │   ")
+        -     println("│ $(p(a[23])) │   │ $(p(a[24])) │   ║")
+        -     println("    ╟───┼───┼───┼───┼───┼───┼───┼───╢")
+        - 
+        -     print("  G ║   │ $(p(a[25])) │   │ $(p(a[26])) │ ")
+        -     println("  │ $(p(a[27])) │   │ $(p(a[28])) ║")
+        -     println("    ╟───┼───┼───┼───┼───┼───┼───┼───╢")
+        - 
+        -     print("  H ║ $(p(a[29])) │   │ $(p(a[30])) │ ")
+        -     println("  │ $(p(a[31])) │   │ $(p(a[32])) │   ║")
+        -     println("    ╚═══╧═══╧═══╧═══╧═══╧═══╧═══╧═══╝")
+        - end
+        - 
