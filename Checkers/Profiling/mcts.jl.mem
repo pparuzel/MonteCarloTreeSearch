@@ -1,0 +1,100 @@
+        - mutable struct Node
+        -     wins::Float64
+        -     sims::Int64
+        -     parent::Union{Node, Void}
+        -     children::Array{Node, 1}
+        -     action::Tuple{Int64,Int64,Vararg{Int64,N} where N}
+        - 
+  2812575     Node(parent::Union{Node, Void}, action::Tuple{Int64,Int64,Vararg{Int64,N} where N}) = new(0, 1, parent, Node[], action)
+        - end
+        - 
+        - mutable struct Tree
+        -     root::Node
+        - 
+        -     function Tree(game::Game)
+        0         root = Node(nothing, (0, 0))
+        0         root.sims = 1
+        0         validMoves = getValidMoves(game)
+        0         for move in validMoves
+        0             push!(root.children, Node(root, move))
+        -         end
+        0         return new(root)
+        -     end
+        - end
+        - 
+        - # TODO: Possible optimization!
+   920174 UCT(ptr; c = 1.414) = ptr.wins / ptr.sims + c * sqrt(log(ptr.parent.sims) / ptr.sims)
+        - 
+    92044 argmax(func, arr) = indmax(func(ch) for ch in arr)
+        - 
+        - function MCTS(itersNum::Int64, tree::Tree, game::Game)
+  6941486     for i in 1:itersNum
+        0         ptr = tree.root
+        0         g = makecopy(game)
+        -     # NOTE: Selection
+    43793         while !isempty(ptr.children)
+        0             best_i = argmax(UCT, ptr.children)
+      912             ptr = ptr.children[best_i]
+        0             justMove(g, ptr.action)
+        -         end
+        0         updatePlayerID(g) # necessary
+        -     # NOTE: Expansion
+       80         valid = length(ptr.action) > 2 ? getValidMovesAfterHop(g, ptr.action[2]) : getValidMoves(g)
+        0         if canMove(g, length(valid))
+    79806             ptr.children = Node[Node(ptr, action) for action in valid]
+    40301             actionNode = rand(ptr.children)
+        0             ptr = actionNode
+        0             valid = move(g, actionNode.action)
+        -         end
+        0         currentPlayer = g.states[g.lastAction[2]] > 0 ? 1 : -1
+        -     # NOTE: Simulation
+        0         while canMove(g, length(valid))
+        0             valid = move(g, rand(valid))
+        -         end
+        -     # NOTE: Backpropagation
+        0         if g.winner == 0
+        0             while ptr != tree.root
+        0                 ptr.sims += 1
+    18432                 ptr.wins += 0.5
+        0                 ptr = ptr.parent
+        -             end
+        -         else
+        0             latest = ptr.action[2]
+        0             while ptr != nothing
+    19472                 ptr.sims += 1
+        0                 if latest != ptr.action[2]
+        0                     currentPlayer = currentPlayer == 1 ? -1 : 1
+        -                 end
+        0                 if currentPlayer == g.winner
+   121056                     ptr.wins += 1
+        -                 end
+        0                 latest = ptr.action[1]
+        0                 ptr = ptr.parent
+        -             end
+        -         end
+        -     end
+        - end
+        - 
+        - # node output
+        - 
+        - function __show_node__(io::IO, node::Node, level=0)
+        -     println(io, "-" ^ 2level, node)
+        -     for n in node.children
+        -         __show_node__(io, n, level + 1)
+        -     end
+        - end
+        - 
+        - function Base.show(io::IO, t::Tree)
+        -     print(io, t.root, "…")
+        - end
+        - 
+        - function depth(node::Node, _depth::Int64, level=0)
+        -     (_depth == level) && println("-" ^ 2level, node)
+        -     for n in node.children
+        -         depth(n, _depth, level + 1)
+        -     end
+        -     nothing
+        - end
+        - 
+        0 Base.show(io::IO, x::Node) = print(io, "Node($(x.wins)/$(x.sims) $(length(x.children)), A: $(x.action))")
+        - 
