@@ -25,51 +25,46 @@ mutable struct Game
     pID::Int64
     count40::Int64
     winner::Union{Int64, Void}
-    bonusMove::Bool
     men::Array{Int64, 1}
 
     function Game()
         states = copy(default_state)
-        # men = Dict{}(1 => 12, -1 => 12)
-        return new(states, 0, 0, nothing, false, Int64[12, 12])
+        return new(states, 0, 0, nothing, Int64[12, 12])
     end
 
-    # function Game(states::Array{Int8, 2}, turn::Int, size::Int, row::Int, active=true)
-    #     return new(states, turn, size, row, active)
-    # end
+    function Game(::Bool)
+        return new()
+    end
 end
 
-function restart(g::Game)
-    g.states = copy(default_state)
+function restart(g::Game, state::Array{Int64, 2}=default_state)
+    g.states = copy(state)
     g.pID = 0
     g.count40 = 0
     g.winner = nothing
     g.men[1] = 12
     g.men[2] = 12
+
+    nothing
 end
 
 function decreaseMen(g::Game, opponent::Int64)
     if opponent > 0
         g.men[2] -= 1
-        # print_with_color(:green, "Bialy bije czarnego $(opponent)\n")
     else
         g.men[1] -= 1
-        # print_with_color(:red, "Czarny bije bialego $(opponent)\n")
     end
 end
 
 Base.show(io::IO, g::Game) = print(io, "Checkers<8x8>")
 
 function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N}, valid::Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1})
-    # player = g.turn % 2 == 0 ? 1 : -1
     player = g.pID
     if length(action) == 2 # normal move
-        # g.states[action[2]] = g.states[action[1]]
         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
         g.states[action[1]] = 0
         g.pID = 1 - g.pID
         valid = getValidMoves(g)
-        g.count40 += 1
     elseif length(action) == 3 # attacking move
         decreaseMen(g, 1 - player)
         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
@@ -77,16 +72,12 @@ function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N}, valid
         g.states[action[3]] = 0
         g.count40 = -1
         valid = getValidMovesAfterHop(g, action[2])
-        if length(valid) > 0 #&& length(valid[end]) == 3
-            # g.bonusMove = true # bonus move looks useless
-            # print_with_color(:green, "BONUS MOVE\n")
-        else
-            # g.bonusMove = false
+        if length(valid) == 0
             g.pID = 1 - g.pID
             valid = getValidMoves(g)
         end
-        g.count40 += 1
     end
+    g.count40 += 1
     return valid
 end
 
@@ -159,10 +150,6 @@ actions = Array{Tuple,1}[
 ]
 
 function trimIfAttack(moves)
-    # TODO: Optimization would be to check only
-    # the last instead of using `any(lambda, moves)`
-
-    # if any(x -> (length(x) == 3), moves)
     if length(moves) > 0 && length(moves[end]) == 3
         filter!(x -> (length(x) == 3), moves)
     end
