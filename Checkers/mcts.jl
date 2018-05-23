@@ -12,36 +12,56 @@ end
 
 mutable struct Tree
     root::Node
+    UCT::Function
 
-    function Tree(game::Game)
-        root = Node(nothing, (0, 0))
-        root.sims = 1
-        validMoves = getValidMoves(game)
-        for move in validMoves
-            push!(root.children, Node(root, move))
-        end
-        return new(root)
+    # function Tree(game::Game)
+    #     root = Node(true)
+    #     root.sims = 1
+    #     validMoves = getValidMoves(game)
+    #     for move in validMoves
+    #         push!(root.children, Node(root, move))
+    #     end
+    #     return new(root)
+    # end
+
+    function Tree(::Bool; uct=1.414)
+        this = new(Node(true))
+        # TODO: Possible optimization!
+        UCT_func(ptr) = ptr.wins / ptr.sims + uct * sqrt(log(ptr.parent.sims) / ptr.sims)
+        this.UCT = UCT_func
+        return this
     end
 end
 
-# TODO: Possible optimization!
-UCT(ptr; c = 1.414) = ptr.wins / ptr.sims + c * sqrt(log(ptr.parent.sims) / ptr.sims)
-
-argmax(func, arr) = indmax(func(ch) for ch in arr)
+function argmax(func, arr)
+    v, best_i = findmax(func(ch) for ch in arr)
+    return best_i
+end
 
 function MCTS(itersNum::Int64, tree::Tree, game::Game)
+    if game.hopMove
+        validMoves = getValidMovesAfterHop(game, game.lastAction[2])
+        if length(validMoves) == 0
+            validMoves = getValidMoves(game)
+        end
+    else
+        validMoves = getValidMoves(game)
+    end
+    for mv in validMoves
+        push!(tree.root.children, Node(tree.root, mv))
+    end
     for i in 1:itersNum
         ptr = tree.root
         g = makecopy(game)
     # NOTE: Selection
         while !isempty(ptr.children)
-            best_i = argmax(UCT, ptr.children)
+            best_i = argmax(tree.UCT, ptr.children)
             ptr = ptr.children[best_i]
             justMove(g, ptr.action)
         end
-        updatePlayerID(g) # necessary
+        updatePlayerID(g) # necessary TEST IT!
     # NOTE: Expansion
-        if length(ptr.action) > 2
+        if g.hopMove
             valid = getValidMovesAfterHop(g, ptr.action[2])
             if length(valid) == 0
                 valid = getValidMoves(g)
@@ -57,14 +77,14 @@ function MCTS(itersNum::Int64, tree::Tree, game::Game)
         end
         currentPlayer = g.states[g.lastAction[2]] > 0 ? 1 : -1
     # NOTE: Simulation
-        while canMove(g) && length(valid) > 0
+        while canMove(g)
             valid = move(g, rand(valid))
         end
     # NOTE: Backpropagation
         if g.winner == 0
             while ptr != tree.root
                 ptr.sims += 1
-                ptr.wins += 0.3
+                ptr.wins += 0.5
                 ptr = ptr.parent
             end
         else
@@ -88,9 +108,19 @@ function selectBestMove(g::Game, t::Tree)
     best_i = indmax(ch.sims for ch in t.root.children)
     t.root = t.root.children[best_i]
     t.root.parent = nothing
+    empty!(t.root.children)
+    println("$(g.pID) played", t.root.action, " and ", g.lastAction)
     move(g, t.root.action)
 
     t.root.action
+end
+
+# deprecated
+function informOpponent(t::Tree, lastAction::Tuple{Int64,Int64,Vararg{Int64,N} where N})
+    ind = findfirst(x->x.action==lastAction, t.root.children)
+    @assert ind != 0 "last action $(lastAction) not found"
+    t.root = t.root.children[ind]
+    t.root.parent = nothing
 end
 
 # node output

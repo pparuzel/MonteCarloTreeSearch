@@ -126,11 +126,15 @@ end
 # NOTE: Do not use justMove with unless you are 100% sure it is a legal move
 # justMove ignore doesnt know if/which player has hopped before or not
 function justMove(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
-    # NOT UPDATING WHICH PLAYER
+    # TODO: UPDATING WHICH PLAYER MOVED
+    if !g.hopMove
+        g.pID = 1 - g.pID
+    end
     if length(action) == 2 # normal move
         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
         g.states[action[1]] = 0
         g.hopMove = false
+        g.pID = 1 - g.pID
     elseif length(action) == 3 # attacking move
         decreaseMen(g, 1 - g.pID)
         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
@@ -150,7 +154,7 @@ function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
     if length(action) == 2 # normal move
         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
         g.states[action[1]] = 0
-        # @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move"
+        @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move"
         g.pID = 1 - g.pID
         g.hopMove = false
         valid = getValidMoves(g)
@@ -161,7 +165,7 @@ function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
         g.states[action[3]] = 0
         g.count40 = -1
         g.hopMove = true
-        # @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move. Action: $(action). $(g.states[action[2]]) ≢ $(g.pID == 0 ? 1 : -1)"
+        @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move. Action: $(action). $(g.states[action[2]]) ≢ $(g.pID == 0 ? 1 : -1)"
         valid = getValidMovesAfterHop(g, action[2])
         if length(valid) == 0
             valid = getValidMoves(g)
@@ -184,6 +188,9 @@ function canMove(g::Game)
     end
     if g.count40 > 39
         g.winner = 0
+        return false
+    end
+    if g.winner != nothing
         return false
     end
     return true
@@ -344,7 +351,6 @@ function getValidMovesAfterHop(g::Game, pos)
             end
         end
     end
-    # GETTER MODIFIES THE STATE
     if length(valid) == 0
         g.hopMove = false
         g.pID = div((sign(board[pos]) + 1), 2)
