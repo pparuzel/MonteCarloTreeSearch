@@ -1,18 +1,35 @@
 include("game.jl")
 include("mcts.jl")
 
-examples = Dict(
+__examples__ = Dict(
     :cool => (Int64[0 0 0 -1; 0 -1 -1 0; 0 0 0 0; 0 -1 0 -1; 1 1 0 0; 0 0 0 -1; -1 -1 -1 1; 1 1 1 1], Int64[7, 9], 0),
     :c2 => (Int64[-1 -1 -1 -1; -1 1 1 1; 1 0 0 0; 0 0 -1 -1; 1 0 1 0; 0 0 0 0; 0 1 1 0; 1 0 0 0], Int64[9, 7], 1),
     :default => (default_state, Int64[12, 12], 0),
 )
 
+function setGame(g::Game, id::Symbol)
+    g.states = copy(__examples__[id][1])
+    g.men[1] = __examples__[id][2][1]
+    g.men[2] = __examples__[id][2][2]
+    g.pID = __examples__[id][3]
+    return nothing
+end
+
+function getGame(id::Symbol)
+    g = Game()
+    g.states = copy(__examples__[id][1])
+    g.men[1] = __examples__[id][2][1]
+    g.men[2] = __examples__[id][2][2]
+    g.pID = __examples__[id][3]
+    return g
+end
+
 function testConvergence(;min=5, max=30, id=:cool, loop=1, mcts=100, c=1.414)
     startState = Game()
-    startState.states, startState.men, startState.pID = deepcopy(examples[id])
+    setGame(startState, id)
     for i in 1:loop
         g = makecopy(startState)
-        t = Tree(false, uct=c)
+        t = Tree(uct=c)
         pastAction = (0, 0)
         counter = 0
         for i in 1:max
@@ -39,7 +56,7 @@ end
 
 function start(;mcts=3000)
     g = Game()
-    t = Tree(false)
+    t = Tree()
     while canMove(g)
         MCTS(mcts, t, g)
         selectBestMove(g, t)
@@ -48,33 +65,34 @@ function start(;mcts=3000)
     return g, t
 end
 
-function twoAgents(;mcts=100, c=(0.5, 1.414))
-    g = Game()
-    g.states, g.men, g.pID = deepcopy(examples[:c2])
-    agents = (Tree(false, uct=c[1]), Tree(false, uct=c[2]))
-    sh(g)
-    while canMove(g)
-        println("Player $(g.pID == 0 ? "WHITE" : "BLACK")…")
-        MCTS(mcts, agents[g.pID+1], g)
-        # println(getValidMoves(g))
-        selectBestMove(g, agents[g.pID+1])
-        sh(g)
+function twoAgents(;iter=100, c=(1.414, 1.414))
+    game = Game()
+    setGame(game, :c2)
+    agents = (Tree(uct=c[1]), Tree(uct=c[2]))
+    sh(game)
+    while canMove(game)
+        valid = getValidMoves(game)
+        println("Player $(game.pID == 0 ? "WHITE" : "BLACK")…")
+        MCTS(iter, agents[game.pID+1], game, valid)
+        selectBestMove(game, agents[game.pID+1])
+        sh(game)
     end
-    return g
+    return game
 end
 
 @enum Player HUMAN=0
 
-function playHumanVsMCTS(;mcts=130)
-    print("Human name: ")
+function playHumanVsMCTS(;iter=130)
+    print("Your name: ")
     name = readline()
     g = Game()
-    agent = Tree(false, uct=0.5)
+    agent = Tree(uct=0.5)
     players = (HUMAN, agent)
     while canMove(g)
-        println("Player $(g.pID == 0 ? name : "MonteCarlo")")
         sh(g)
-        MCTS(mcts, players[g.pID+1], g)
+        valid = getValidMoves(g) # makes sure which player should play now
+        println("Player $(g.pID == 0 ? name : "MonteCarlo")")
+        MCTS(iter, players[g.pID+1], g, valid)
         selectBestMove(g, players[g.pID+1])
     end
     sh(g)
@@ -85,7 +103,7 @@ function selectBestMove(g::Game, ::Player)
     move(g, parseUserAction())
 end
 
-function MCTS(::Int64, ::Player, ::Game) end
+function MCTS(::Int64, ::Player, ::Game, ::Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}) end
 
 function parseUserAction()
     s = readline()

@@ -14,17 +14,7 @@ mutable struct Tree
     root::Node
     UCT::Function
 
-    # function Tree(game::Game)
-    #     root = Node(true)
-    #     root.sims = 1
-    #     validMoves = getValidMoves(game)
-    #     for move in validMoves
-    #         push!(root.children, Node(root, move))
-    #     end
-    #     return new(root)
-    # end
-
-    function Tree(::Bool; uct=1.414)
+    function Tree(; uct=1.414)
         this = new(Node(true))
         # TODO: Possible optimization!
         UCT_func(ptr) = ptr.wins / ptr.sims + uct * sqrt(log(ptr.parent.sims) / ptr.sims)
@@ -38,18 +28,11 @@ function argmax(func, arr)
     return best_i
 end
 
-function MCTS(itersNum::Int64, tree::Tree, game::Game)
-    if game.hopMove
-        validMoves = getValidMovesAfterHop(game, game.lastAction[2])
-        if length(validMoves) == 0
-            validMoves = getValidMoves(game)
-        end
-    else
-        validMoves = getValidMoves(game)
-    end
-    for mv in validMoves
+function MCTS(itersNum::Int64, tree::Tree, game::Game, initMoves::Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1})
+    for mv in initMoves
         push!(tree.root.children, Node(tree.root, mv))
     end
+    # Start of MCTS loop
     for i in 1:itersNum
         ptr = tree.root
         g = makecopy(game)
@@ -59,29 +42,23 @@ function MCTS(itersNum::Int64, tree::Tree, game::Game)
             ptr = ptr.children[best_i]
             justMove(g, ptr.action)
         end
-        updatePlayerID(g) # necessary TEST IT!
     # NOTE: Expansion
-        if g.hopMove
-            valid = getValidMovesAfterHop(g, ptr.action[2])
-            if length(valid) == 0
-                valid = getValidMoves(g)
-            end
-        else
-            valid = getValidMoves(g)
-        end
-        if canMove(g) && length(valid) > 0
+        valid = getValidMoves(g)
+        if canMove(g)
             ptr.children = Node[Node(ptr, action) for action in valid]
             actionNode = rand(ptr.children)
             ptr = actionNode
-            valid = move(g, actionNode.action)
+            move(g, actionNode.action)
+            valid = getValidMoves(g)
         end
         currentPlayer = g.states[g.lastAction[2]] > 0 ? 1 : -1
     # NOTE: Simulation
         while canMove(g)
-            valid = move(g, rand(valid))
+            move(g, rand(valid))
+            valid = getValidMoves(g)
         end
     # NOTE: Backpropagation
-        if g.winner == 0
+        if g.winner == 0 # game ended with a tie
             while ptr != tree.root
                 ptr.sims += 1
                 ptr.wins += 0.5

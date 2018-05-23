@@ -1,35 +1,3 @@
-#=
-
-g = Game()
-valid = getValidMoves(g)
-while canMove(g, length(valid))
-    valid = move(g, rand(valid), valid)
-end
-
-
-while canMove(g, length(valid))
-    println("Ruch $(g.pID == 0 ? "bialego" : "czarnego")")
-    valid = move(g, rand(valid), valid)
-    sh(g); @show g.men, g.pID
-end
-
-
-restart(g); valid = getValidMoves(g)
-while canMove(g, length(valid))
-    move(g, rand(valid))
-    sh(g); @show g.lastAction
-    if length(g.lastAction) == 3
-        valid = getValidMovesAfterHop(g, g.lastAction[2])
-        if length(valid) == 0
-            valid = getValidMoves(g)
-        end
-    else
-        valid = getValidMoves(g)
-    end
-end
-
-=#
-
 default_state = Int64[-1 -1 -1 -1; -1 -1 -1 -1;
                       -1 -1 -1 -1;  0  0  0  0;
                        0  0  0  0;  1  1  1  1;
@@ -81,99 +49,60 @@ function makecopy(g::Game)
 end
 
 function decreaseMen(g::Game, opponent::Int64)
-    if opponent > 0
-        g.men[2] -= 1
-    else
-        g.men[1] -= 1
-    end
+    g.men[opponent + 1] -= 1
 end
 
 Base.show(io::IO, g::Game) = print(io, "Checkers<8x8>")
 
-# function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N}, valid::Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1})
-#     player = g.pID
-#     if length(action) == 2 # normal move
-#         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
-#         g.states[action[1]] = 0
-#         g.pID = 1 - g.pID
-#         valid = getValidMoves(g)
-#     elseif length(action) == 3 # attacking move
-#         decreaseMen(g, 1 - player)
-#         g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
-#         g.states[action[1]] = 0
-#         g.states[action[3]] = 0
-#         g.count40 = -1
-#         valid = getValidMovesAfterHop(g, action[2])
-#         if length(valid) == 0
-#             g.pID = 1 - g.pID
-#             valid = getValidMoves(g)
-#         end
+## deprecated
+# function updatePlayerID(g::Game)
+#     if g.hopMove
+#         g.pID = div((-sign(g.states[g.lastAction[2]]) + 1), 2)
+#     else
+#         g.pID = div((sign(g.states[g.lastAction[2]]) + 1), 2)
 #     end
-#     g.lastAction = action
-#     g.count40 += 1
-#     return valid
 # end
 
-function updatePlayerID(g::Game)
-    if g.hopMove
-        g.pID = div((-sign(g.states[g.lastAction[2]]) + 1), 2)
-    else
-        g.pID = div((sign(g.states[g.lastAction[2]]) + 1), 2)
-    end
-end
-
-# IMPORTANT NOTE: DO NOT FORGET THAT AFTERHOP PLAYER IS NOT CHANGED!
-# NOTE: Do not use justMove with unless you are 100% sure it is a legal move
-# justMove ignore doesnt know if/which player has hopped before or not
+# Move without using getValidMoves() function
+# Never use getValidMoves() and then justMove!
 function justMove(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
-    # TODO: UPDATING WHICH PLAYER MOVED
-    if !g.hopMove
-        g.pID = 1 - g.pID
+    if length(g.lastAction) == 3 && g.lastAction[2] != action[1]
+        g.pID = 1 - g.pID # or g.pID = id_gracza_na_pozycji_board[action[1]]
     end
+    g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+    g.states[action[1]] = 0
     if length(action) == 2 # normal move
-        g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
-        g.states[action[1]] = 0
-        g.hopMove = false
-        g.pID = 1 - g.pID
-    elseif length(action) == 3 # attacking move
-        decreaseMen(g, 1 - g.pID)
-        g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
-        g.states[action[1]] = 0
-        g.states[action[3]] = 0
-        g.count40 = -1
-        g.hopMove = true
-    end
-    g.lastAction = action
-    g.count40 += 1
-end
-
-function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
-    # if length(g.lastAction) == 3 && g.lastAction[2] != action[1]
-    #     g.pID = (sign(g.states[action[1]]) + 1) / 2
-    # end
-    if length(action) == 2 # normal move
-        g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
-        g.states[action[1]] = 0
         @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move"
         g.pID = 1 - g.pID
         g.hopMove = false
-        valid = getValidMoves(g)
-    else #if length(action) == 3 # attacking move
+    else # if length(action) == 3 # attacking move
+        @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move. Action: $(action). $(g.states[action[2]]) ≢ $(g.pID == 0 ? 1 : -1)"
         decreaseMen(g, 1 - g.pID)
-        g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
-        g.states[action[1]] = 0
         g.states[action[3]] = 0
         g.count40 = -1
         g.hopMove = true
-        @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move. Action: $(action). $(g.states[action[2]]) ≢ $(g.pID == 0 ? 1 : -1)"
-        valid = getValidMovesAfterHop(g, action[2])
-        if length(valid) == 0
-            valid = getValidMoves(g)
-        end
     end
-    g.lastAction = action
     g.count40 += 1
-    return valid
+    g.lastAction = action
+end
+
+# Use getValidMoves() before moving!
+function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
+    g.states[action[2]] = (action[2] in kingStrip ? 2sign(g.states[action[1]]) : g.states[action[1]])
+    g.states[action[1]] = 0
+    if length(action) == 2 # normal move
+        @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move"
+        g.pID = 1 - g.pID
+        g.hopMove = false
+    else # if length(action) == 3 # attacking move
+        @assert sign(g.states[action[2]]) == (g.pID == 0 ? 1 : -1) "Wrong player move. Action: $(action). $(g.states[action[2]]) ≢ $(g.pID == 0 ? 1 : -1)"
+        decreaseMen(g, 1 - g.pID)
+        g.states[action[3]] = 0
+        g.count40 = -1
+        g.hopMove = true
+    end
+    g.count40 += 1
+    g.lastAction = action
 end
 
 function canMove(g::Game)
@@ -241,122 +170,251 @@ function trimIfAttack(moves)
     end
 end
 
+function playerID(value::Int64)
+    (value > 0) && return 0
+    (value < 0) && return 1
+    # @assert !(value == 0) "PlayerID of value 0"
+    return 9
+end
+
 function getValidMoves(g::Game)
-    # PLAYER MUST HOP
-    player = g.pID
     valid = Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}()
+    # na koncu zamien player i board na g.* zeby "przyspieszyc"
+    # to samo zrob z `A` jako actions[i] i moze dla `i` też
+    player = g.pID
     board = g.states
-    if player == 1
-        hop = false
-        for i in 1:length(board)
-            if board[i] == 0
-                # D_HD_U_HU
+    hop = false
+    # actions -> [Down, HopDown, Up, HopUp]
+    if g.hopMove # player has to hop or pass
+        i = g.lastAction[2]
+        if player == 0
+            A = actions[i]
+            for i4 in 1:length(A[4])
+                if board[A[4][i4]] == 0 && board[A[3][i4]] < 0
+                    push!(valid, (i, A[4][i4], A[3][i4]))
+                end
+            end # for i4
+            if board[i] > 1
+                for i2 in 1:length(A[2])
+                    if board[A[2][i2]] == 0 && board[A[1][i2]] < 0
+                        push!(valid, (i, A[2][i2], A[1][i2]))
+                    end
+                end # for i2
+            end # if ... > 1
+        else # if player == 1
+            A = actions[i]
+            for i2 in 1:length(A[2])
+                if board[A[2][i2]] == 0 && board[A[1][i2]] > 0
+                    push!(valid, (i, A[2][i2], A[1][i2]))
+                end
+            end # for i2
+            if board[i] < -1
+                for i4 in 1:length(A[4])
+                    if board[A[4][i4]] == 0 && board[A[3][i4]] > 0
+                        push!(valid, (i, A[4][i4], A[3][i4]))
+                    end
+                end # for i4
+            end # if ... < -1
+        end
+        if length(valid) == 0
+            g.hopMove = false
+            g.pID = 1 - g.pID
+        end
+    end # player can't second-hop
+    if !g.hopMove # check again whether it's a different player
+        if player == 0
+            for i in 1:length(board)
+                (board[i] <= 0) && continue
                 A = actions[i]
                 for i4 in 1:length(A[4])
-                    if board[A[4][i4]] < 0 && board[A[3][i4]] > 0
-                        push!(valid, (A[4][i4], i, A[3][i4]))
+                    if board[A[4][i4]] == 0 && board[A[3][i4]] < 0
+                        push!(valid, (i, A[4][i4], A[3][i4]))
                         hop = true
                     end
-                end
-                for i2 in 1:length(A[2])
-                    if board[A[2][i2]] < -1 && board[A[1][i2]] > 0
-                        push!(valid, (A[2][i2], i, A[1][i2]))
-                        hop = true
-                    end
+                end # for i4
+                if board[i] > 1
+                    for i2 in 1:length(A[2])
+                        if board[A[2][i2]] == 0 && board[A[1][i2]] < 0
+                            push!(valid, (i, A[2][i2], A[1][i2]))
+                            hop = true
+                        end
+                    end # for i2
                 end
                 if !hop
                     for i3 in 1:length(A[3])
-                        if board[A[3][i3]] < 0
-                            push!(valid, (A[3][i3], i))
+                        if board[A[3][i3]] == 0
+                            push!(valid, (i, A[3][i3]))
                         end
-                    end
-                    for i1 in 1:length(A[1])
-                        if board[A[1][i1]] < -1
-                            push!(valid, (A[1][i1], i))
-                        end
-                    end
-                end # not hop
-            end # if board[i] == 0
-        end # for i
-    else # if
-        hop = false
-        for i in 1:length(board)
-            if board[i] == 0
-                # D_HD_U_HU
-                A = actions[i]
-                for i2 in 1:length(A[2])
-                    if board[A[2][i2]] > 0 && board[A[1][i2]] < 0
-                        push!(valid, (A[2][i2], i, A[1][i2]))
-                        hop = true
+                    end # for i3
+                    if board[i] > 1
+                        for i1 in 1:length(A[1])
+                            if board[A[1][i1]] == 0
+                                push!(valid, (i, A[1][i1]))
+                            end
+                        end # for i1
                     end
                 end
-                for i4 in 1:length(A[4])
-                    if board[A[4][i4]] > 1 && board[A[3][i4]] < 0
-                        push!(valid, (A[4][i4], i, A[3][i4]))
+            end
+            trimIfAttack(valid)
+        else # if player == 1
+            for i in 1:length(board)
+                (board[i] >= 0) && continue
+                A = actions[i]
+                for i2 in 1:length(A[2])
+                    if board[A[2][i2]] == 0 && board[A[1][i2]] > 0
+                        push!(valid, (i, A[2][i2], A[1][i2]))
                         hop = true
                     end
+                end # for i2
+                if board[i] > 1
+                    for i4 in 1:length(A[4])
+                        if board[A[4][i4]] == 0 && board[A[3][i4]] > 0
+                            push!(valid, (i, A[4][i4], A[3][i4]))
+                            hop = true
+                        end
+                    end # for i4
                 end
                 if !hop
                     for i1 in 1:length(A[1])
-                        if board[A[1][i1]] > 0
-                            push!(valid, (A[1][i1], i))
+                        if board[A[1][i1]] == 0
+                            push!(valid, (i, A[1][i1]))
                         end
+                    end # for i1
+                    if board[i] > 1
+                        for i3 in 1:length(A[3])
+                            if board[A[3][i3]] == 0
+                                push!(valid, (i, A[3][i3]))
+                            end
+                        end # for i3
                     end
-                    for i3 in 1:length(A[3])
-                        if board[A[3][i3]] > 1
-                            push!(valid, (A[3][i3], i))
-                        end
-                    end
-                end # not hop
-            end # if board[i] == 0
-        end # for i
-    end # if player
-    trimIfAttack(valid)
+                end
+            end
+            trimIfAttack(valid)
+        end # if player
+    end # if finished filling valid moves
+    @assert length(valid) > 0 "Check if valid can be empty, if so --- remove assertion"
     if length(valid) == 0
         g.winner = g.pID == 0 ? -1 : 1
     end
     return valid
 end
 
-function getValidMovesAfterHop(g::Game, pos)
-    player = g.pID
-    valid = Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}()
-    board = g.states
-    # D_HD_U_HU
-    A = actions[pos]
-    if player == 1
-        for i2 in 1:length(A[2])
-            if board[A[2][i2]] == 0 && board[A[1][i2]] > 0
-                push!(valid, (pos, A[2][i2], A[1][i2]))
-            end
-        end
-        if board[pos] < -1
-            for i4 in 1:length(A[4])
-                if board[A[4][i4]] == 0 && board[A[3][i4]] > 0
-                    push!(valid, (pos, A[4][i4], A[3][i4]))
-                end
-            end
-        end
-    else # player > 0
-        for i4 in 1:length(A[4])
-            if board[A[4][i4]] == 0 && board[A[3][i4]] < 0
-                push!(valid, (pos, A[4][i4], A[3][i4]))
-            end
-        end
-        if board[pos] > 1
-            for i2 in 1:length(A[2])
-                if board[A[2][i2]] == 0 && board[A[1][i2]] < 0
-                    push!(valid, (pos, A[2][i2], A[1][i2]))
-                end
-            end
-        end
-    end
-    if length(valid) == 0
-        g.hopMove = false
-        g.pID = div((sign(board[pos]) + 1), 2)
-    end
-    return valid
-end
+# function getValidMoves(g::Game)
+#     # PLAYER MUST HOP
+#     player = g.pID
+#     valid = Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}()
+#     board = g.states
+#     if player == 1
+#         hop = false
+#         for i in 1:length(board)
+#             if board[i] == 0
+#                 # D_HD_U_HU
+#                 A = actions[i]
+#                 for i4 in 1:length(A[4])
+#                     if board[A[4][i4]] < 0 && board[A[3][i4]] > 0
+#                         push!(valid, (A[4][i4], i, A[3][i4]))
+#                         hop = true
+#                     end
+#                 end
+#                 for i2 in 1:length(A[2])
+#                     if board[A[2][i2]] < -1 && board[A[1][i2]] > 0
+#                         push!(valid, (A[2][i2], i, A[1][i2]))
+#                         hop = true
+#                     end
+#                 end
+#                 if !hop
+#                     for i3 in 1:length(A[3])
+#                         if board[A[3][i3]] < 0
+#                             push!(valid, (A[3][i3], i))
+#                         end
+#                     end
+#                     for i1 in 1:length(A[1])
+#                         if board[A[1][i1]] < -1
+#                             push!(valid, (A[1][i1], i))
+#                         end
+#                     end
+#                 end # not hop
+#             end # if board[i] == 0
+#         end # for i
+#     else # if
+#         hop = false
+#         for i in 1:length(board)
+#             if board[i] == 0
+#                 # D_HD_U_HU
+#                 A = actions[i]
+#                 for i2 in 1:length(A[2])
+#                     if board[A[2][i2]] > 0 && board[A[1][i2]] < 0
+#                         push!(valid, (A[2][i2], i, A[1][i2]))
+#                         hop = true
+#                     end
+#                 end
+#                 for i4 in 1:length(A[4])
+#                     if board[A[4][i4]] > 1 && board[A[3][i4]] < 0
+#                         push!(valid, (A[4][i4], i, A[3][i4]))
+#                         hop = true
+#                     end
+#                 end
+#                 if !hop
+#                     for i1 in 1:length(A[1])
+#                         if board[A[1][i1]] > 0
+#                             push!(valid, (A[1][i1], i))
+#                         end
+#                     end
+#                     for i3 in 1:length(A[3])
+#                         if board[A[3][i3]] > 1
+#                             push!(valid, (A[3][i3], i))
+#                         end
+#                     end
+#                 end # not hop
+#             end # if board[i] == 0
+#         end # for i
+#     end # if player
+#     trimIfAttack(valid)
+#     if length(valid) == 0
+#         g.winner = g.pID == 0 ? -1 : 1
+#     end
+#     return valid
+# end
+#
+# function getValidMovesAfterHop(g::Game, pos)
+#     player = g.pID
+#     valid = Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}()
+#     board = g.states
+#     # D_HD_U_HU
+#     A = actions[pos]
+#     if player == 1
+#         for i2 in 1:length(A[2])
+#             if board[A[2][i2]] == 0 && board[A[1][i2]] > 0
+#                 push!(valid, (pos, A[2][i2], A[1][i2]))
+#             end
+#         end
+#         if board[pos] < -1
+#             for i4 in 1:length(A[4])
+#                 if board[A[4][i4]] == 0 && board[A[3][i4]] > 0
+#                     push!(valid, (pos, A[4][i4], A[3][i4]))
+#                 end
+#             end
+#         end
+#     else # player > 0
+#         for i4 in 1:length(A[4])
+#             if board[A[4][i4]] == 0 && board[A[3][i4]] < 0
+#                 push!(valid, (pos, A[4][i4], A[3][i4]))
+#             end
+#         end
+#         if board[pos] > 1
+#             for i2 in 1:length(A[2])
+#                 if board[A[2][i2]] == 0 && board[A[1][i2]] < 0
+#                     push!(valid, (pos, A[2][i2], A[1][i2]))
+#                 end
+#             end
+#         end
+#     end
+#     if length(valid) == 0
+#         g.hopMove = false
+#         g.pID = div((sign(board[pos]) + 1), 2)
+#     end
+#     return valid
+# end
 
 function play()
     s = ""
