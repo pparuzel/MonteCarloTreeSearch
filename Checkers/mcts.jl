@@ -32,6 +32,7 @@ function MCTS(itersNum::Int64, tree::Tree, game::Game, initMoves::Array{Tuple{In
     for mv in initMoves
         push!(tree.root.children, Node(tree.root, mv))
     end
+    (length(initMoves) == 1) && (return nothing)
     # Start of MCTS loop
     for i in 1:itersNum
         ptr = tree.root
@@ -40,7 +41,9 @@ function MCTS(itersNum::Int64, tree::Tree, game::Game, initMoves::Array{Tuple{In
         while !isempty(ptr.children)
             best_i = argmax(tree.UCT, ptr.children)
             ptr = ptr.children[best_i]
-            justMove(g, ptr.action)
+            v = getValidMoves(g)
+            @assert ptr.action in v "This move is illegal"
+            move(g, ptr.action)
         end
     # NOTE: Expansion
         valid = getValidMoves(g)
@@ -79,6 +82,7 @@ function MCTS(itersNum::Int64, tree::Tree, game::Game, initMoves::Array{Tuple{In
             end
         end
     end
+    return nothing
 end
 
 function selectBestMove(g::Game, t::Tree)
@@ -86,18 +90,11 @@ function selectBestMove(g::Game, t::Tree)
     t.root = t.root.children[best_i]
     t.root.parent = nothing
     empty!(t.root.children)
-    println("$(g.pID) played", t.root.action, " and ", g.lastAction)
+    v = getValidMoves(g)
+    @assert (t.root.action in v) "This move is illegal"
     move(g, t.root.action)
 
     t.root.action
-end
-
-# deprecated
-function informOpponent(t::Tree, lastAction::Tuple{Int64,Int64,Vararg{Int64,N} where N})
-    ind = findfirst(x->x.action==lastAction, t.root.children)
-    @assert ind != 0 "last action $(lastAction) not found"
-    t.root = t.root.children[ind]
-    t.root.parent = nothing
 end
 
 # node output

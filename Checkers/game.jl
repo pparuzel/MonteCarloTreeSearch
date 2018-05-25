@@ -101,6 +101,7 @@ function move(g::Game, action::Tuple{Int64,Int64,Vararg{Int64,N} where N})
         g.count40 = -1
         g.hopMove = true
     end
+    @assert count(x->(x > 0), g.states) == g.men[1] && count(x->(x < 0), g.states) == g.men[2] "Wrong men counting!"
     g.count40 += 1
     g.lastAction = action
 end
@@ -181,13 +182,12 @@ function getValidMoves(g::Game)
     valid = Array{Tuple{Int64,Int64,Vararg{Int64,N} where N},1}()
     # na koncu zamien player i board na g.* zeby "przyspieszyc"
     # to samo zrob z `A` jako actions[i] i moze dla `i` też
-    player = g.pID
     board = g.states
     hop = false
     # actions -> [Down, HopDown, Up, HopUp]
     if g.hopMove # player has to hop or pass
         i = g.lastAction[2]
-        if player == 0
+        if g.pID == 0
             A = actions[i]
             for i4 in 1:length(A[4])
                 if board[A[4][i4]] == 0 && board[A[3][i4]] < 0
@@ -216,13 +216,13 @@ function getValidMoves(g::Game)
                 end # for i4
             end # if ... < -1
         end
-        if length(valid) == 0
+        if length(valid) == 0 # player can't second-hop
             g.hopMove = false
             g.pID = 1 - g.pID
         end
-    end # player can't second-hop
+    end
     if !g.hopMove # check again whether it's a different player
-        if player == 0
+        if g.pID == 0
             for i in 1:length(board)
                 (board[i] <= 0) && continue
                 A = actions[i]
@@ -280,7 +280,7 @@ function getValidMoves(g::Game)
                             push!(valid, (i, A[1][i1]))
                         end
                     end # for i1
-                    if board[i] > 1
+                    if board[i] < -1
                         for i3 in 1:length(A[3])
                             if board[A[3][i3]] == 0
                                 push!(valid, (i, A[3][i3]))
@@ -292,7 +292,7 @@ function getValidMoves(g::Game)
             trimIfAttack(valid)
         end # if player
     end # if finished filling valid moves
-    @assert length(valid) > 0 "Check if valid can be empty, if so --- remove assertion"
+    # @assert length(valid) > 0 (sh(g); "Check if valid can be empty, if so --- remove assertion\nw:$(g.winner), pID:$(g.pID), m:$(g.men),40:$(g.count40), hop:$(g.hopMove)")
     if length(valid) == 0
         g.winner = g.pID == 0 ? -1 : 1
     end

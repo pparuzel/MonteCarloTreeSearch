@@ -70,8 +70,9 @@ function twoAgents(;iter=100, c=(1.414, 1.414))
     setGame(game, :c2)
     agents = (Tree(uct=c[1]), Tree(uct=c[2]))
     sh(game)
-    while canMove(game)
+    while true
         valid = getValidMoves(game)
+        canMove(game) || break
         println("Player $(game.pID == 0 ? "WHITE" : "BLACK")…")
         MCTS(iter, agents[game.pID+1], game, valid)
         selectBestMove(game, agents[game.pID+1])
@@ -82,20 +83,21 @@ end
 
 @enum Player HUMAN=0
 
-function playHumanVsMCTS(;iter=130)
+function playHumanVsMCTS(;iter=130, c=1.414)
     print("Your name: ")
     name = readline()
     g = Game()
-    agent = Tree(uct=0.5)
+    agent = Tree(uct=c)
     players = (HUMAN, agent)
-    while canMove(g)
-        sh(g)
+    sh(g)
+    while true
         valid = getValidMoves(g) # makes sure which player should play now
+        canMove(g) || break
         println("Player $(g.pID == 0 ? name : "MonteCarlo")")
         MCTS(iter, players[g.pID+1], g, valid)
         selectBestMove(g, players[g.pID+1])
+        sh(g)
     end
-    sh(g)
     return g
 end
 
