@@ -8,6 +8,8 @@ function configure(; ties=:coinflip, nodeformat=:combined)
         coinflip() = 0
     elseif ties == :win
         coinflip() = 1
+    elseif ties == :half
+        coinflip() = 0.5
     else
         nothing
     end

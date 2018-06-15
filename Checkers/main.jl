@@ -3,7 +3,7 @@ include("mcts.jl")
 
 __examples__ = Dict(
     :cool => (Int64[0 0 0 -1; 0 -1 -1 0; 0 0 0 0; 0 -1 0 -1; 1 1 0 0; 0 0 0 -1; -1 -1 -1 1; 1 1 1 1], Int64[7, 9], 0),
-    :c2 => (Int64[-1 -1 -1 -1; -1 1 1 1; 1 0 0 0; 0 0 -1 -1; 1 0 1 0; 0 0 0 0; 0 1 1 0; 1 0 0 0], Int64[9, 7], 1),
+    :atak => (Int64[-1 -1 -1 -1; -1 1 1 1; 1 0 0 0; 0 0 -1 -1; 1 0 1 0; 0 0 0 0; 0 1 1 0; 1 0 0 0], Int64[9, 7], 1),
     :default => (default_state, Int64[12, 12], 0),
 )
 
@@ -22,6 +22,16 @@ function getGame(id::Symbol)
     g.men[2] = __examples__[id][2][2]
     g.pID = __examples__[id][3]
     return g
+end
+
+function whose(game::Game)
+    println("It's $(game.pID == 0 ? "white" : "black")\'s turn.")
+    nothing
+end
+
+function board(game::Game)
+    sh(game)
+    nothing
 end
 
 function testConvergence(;min=5, max=30, id=:cool, loop=1, mcts=100, c=1.414)
@@ -65,9 +75,9 @@ function start(;mcts=3000)
     return g, t
 end
 
-function twoAgents(;iter=100, c=(1.414, 1.414))
+function twoAgents(;iter=100, c=(1.414, 1.414), ex=:default)
     game = Game()
-    setGame(game, :c2)
+    setGame(game, ex)
     agents = (Tree(uct=c[1]), Tree(uct=c[2]))
     sh(game)
     while true
@@ -77,6 +87,11 @@ function twoAgents(;iter=100, c=(1.414, 1.414))
         MCTS(iter, agents[game.pID+1], game, valid)
         selectBestMove(game, agents[game.pID+1])
         sh(game)
+    end
+    if game.winner == 0
+        println("REMIS")
+    else
+        println("Wygrał $(game.winner == 1 ? "BIAŁY" : "CZARNY")")
     end
     return game
 end
@@ -97,6 +112,11 @@ function playHumanVsMCTS(;iter=130, c=1.414)
         MCTS(iter, players[g.pID+1], g, valid)
         selectBestMove(g, players[g.pID+1])
         sh(g)
+    end
+    if g.winner == 0
+        println("REMIS")
+    else
+        println("Wygrał $(g.winner == 1 ? name : "MonteCarlo")")
     end
     return g
 end

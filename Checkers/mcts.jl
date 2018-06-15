@@ -10,6 +10,16 @@ mutable struct Node
     Node(::Bool) = new(0, 1, nothing, Node[], (0, 0))
 end
 
+__LOGARITHM__ = [log(i) for i in 1:10000]
+
+function ln(i::Int64)
+    if i <= 10000
+        return __LOGARITHM__[i]
+    else
+        return log(i)
+    end
+end
+
 mutable struct Tree
     root::Node
     UCT::Function
@@ -17,7 +27,7 @@ mutable struct Tree
     function Tree(; uct=1.414)
         this = new(Node(true))
         # TODO: Possible optimization!
-        UCT_func(ptr) = ptr.wins / ptr.sims + uct * sqrt(log(ptr.parent.sims) / ptr.sims)
+        UCT_func(ptr) = ptr.wins / ptr.sims + uct * sqrt(ln(ptr.parent.sims) / ptr.sims)
         this.UCT = UCT_func
         return this
     end
@@ -32,7 +42,7 @@ function MCTS(itersNum::Int64, tree::Tree, game::Game, initMoves::Array{Tuple{In
     for mv in initMoves
         push!(tree.root.children, Node(tree.root, mv))
     end
-    (length(initMoves) == 1) && (return nothing)
+    (length(initMoves) == 1) && (#=sleep(0.8);=# return nothing)
     # Start of MCTS loop
     for i in 1:itersNum
         ptr = tree.root

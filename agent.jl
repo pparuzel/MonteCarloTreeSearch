@@ -2,9 +2,9 @@ include("config.jl")
 
 mutable struct Node
     key::Int
-    wins::Int
+    wins::Float64
     sims::Int
-    winsAMAF::Int
+    winsAMAF::Float64
     simsAMAF::Int
     parent::Union{Node, Void}
     children::Array{Node, 1}
@@ -53,12 +53,13 @@ function uctIndex(parent, rave_squared, explrate)
     return (uctmax_i == 0 ? rand(1:length(parent.children)) : uctmax_i)
 end
 
-function mcts(agent::Agent, game::Game; seconds=-1)
+function mcts(agent::Agent, game::Game; maxIters=1000)
     ptr = agent.ptr
     flatsize = game.size ^ 2
-    seconds *= 1e9
-    t0 = time_ns()
-    while time_ns() - t0 < seconds
+    # seconds *= 1e9
+    # t0 = time_ns()
+    # while time_ns() - t0 < seconds
+    for i in 1:maxIters
         g = makecopy(game)
         movekeys = (Int[], Int[])
         INDEX = 1
@@ -105,8 +106,13 @@ function mcts(agent::Agent, game::Game; seconds=-1)
                 end
             end
             ptr = ptr.parent
-            INDEX = (INDEX % 2) + 1
-            increment = (increment + 1) % 2
+            # INDEX = (INDEX % 2) + 1
+            INDEX = 3 - INDEX
+            # TODO: 3 - INDEX
+
+            # increment = (increment + 1) % 2
+            increment = 1 - increment
+            # TODO:  := inc xor 0x01
         end
         ptr.sims += 1
         ptr.wins += increment
